@@ -275,39 +275,26 @@ function TradesTab({trades,pnl}){
 }
 
 // ── Weex Tab ───────────────────────────────────────────────────────────────────
-function WeexTab({weexConnected,weexBalance,weexKey,setWeexKey,weexSecret,setWeexSecret,weexPassphrase,setWeexPassphrase,weexFuturesKey,setWeexFuturesKey,weexFuturesSecret,setWeexFuturesSecret,connecting,connectWeex,disconnectWeex,mode,setMode}){
+function WeexTab({weexConnected,weexBalance,weexKey,setWeexKey,weexSecret,setWeexSecret,weexPassphrase,setWeexPassphrase,connecting,connectWeex,disconnectWeex,mode,setMode}){
   if(!weexConnected) return(
     <div>
       <div style={{...glass({background:"linear-gradient(135deg,rgba(108,92,231,0.2),rgba(56,189,248,0.1))",marginBottom:16})}}>
         <div style={{fontSize:16,fontWeight:700,marginBottom:6}}>🔗 Connect Your Weex Account</div>
-        <div style={{fontSize:13,color:"rgba(255,255,255,0.5)",lineHeight:1.7}}>Enter your Weex API credentials. Spot and Futures require <b style={{color:"#ffd700"}}>separate API keys</b> on Weex.</div>
+        <div style={{fontSize:13,color:"rgba(255,255,255,0.5)",lineHeight:1.7}}>Enter your Weex API credentials. One API key works for both Spot and Futures wallets.</div>
       </div>
       <div style={glass()}>
-        <div style={{fontSize:13,fontWeight:700,marginBottom:6,color:"#a78bfa"}}>SPOT API Credentials</div>
-        <div style={{fontSize:11,color:"rgba(255,255,255,0.4)",marginBottom:14}}>Create from: Weex App → Profile → API Management</div>
+        <div style={{fontSize:13,fontWeight:700,marginBottom:14}}>API Credentials</div>
         <div style={{marginBottom:12}}>
-          <div style={{fontSize:11,color:"rgba(255,255,255,0.5)",marginBottom:6,fontWeight:600}}>SPOT API KEY</div>
-          <input value={weexKey} onChange={e=>setWeexKey(e.target.value)} placeholder="Paste your Weex Spot API key" style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:12,padding:"11px 14px",color:"#fff",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+          <div style={{fontSize:11,color:"rgba(255,255,255,0.5)",marginBottom:6,fontWeight:600}}>API KEY</div>
+          <input value={weexKey} onChange={e=>setWeexKey(e.target.value)} placeholder="Paste your Weex API key" style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:12,padding:"11px 14px",color:"#fff",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
         </div>
         <div style={{marginBottom:12}}>
-          <div style={{fontSize:11,color:"rgba(255,255,255,0.5)",marginBottom:6,fontWeight:600}}>SPOT API SECRET</div>
-          <input value={weexSecret} onChange={e=>setWeexSecret(e.target.value)} placeholder="Paste your Weex Spot API secret" type="password" style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:12,padding:"11px 14px",color:"#fff",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+          <div style={{fontSize:11,color:"rgba(255,255,255,0.5)",marginBottom:6,fontWeight:600}}>API SECRET</div>
+          <input value={weexSecret} onChange={e=>setWeexSecret(e.target.value)} placeholder="Paste your Weex API secret" type="password" style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:12,padding:"11px 14px",color:"#fff",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
         </div>
         <div style={{marginBottom:16}}>
-          <div style={{fontSize:11,color:"rgba(255,255,255,0.5)",marginBottom:6,fontWeight:600}}>PASSPHRASE (same for both)</div>
+          <div style={{fontSize:11,color:"rgba(255,255,255,0.5)",marginBottom:6,fontWeight:600}}>PASSPHRASE</div>
           <input value={weexPassphrase} onChange={e=>setWeexPassphrase(e.target.value)} placeholder="Enter your API passphrase" type="password" style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:12,padding:"11px 14px",color:"#fff",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
-        </div>
-        <div style={{borderTop:"1px solid rgba(255,255,255,0.08)",paddingTop:14,marginBottom:14}}>
-          <div style={{fontSize:13,fontWeight:700,marginBottom:6,color:"#38bdf8"}}>FUTURES API Credentials <span style={{fontSize:11,color:"rgba(255,255,255,0.4)",fontWeight:400}}>(for USDT-M wallet)</span></div>
-          <div style={{fontSize:11,color:"rgba(255,255,255,0.4)",marginBottom:10}}>Create from: Weex App → Futures → Profile → API Management (separate from spot)</div>
-          <div style={{marginBottom:12}}>
-            <div style={{fontSize:11,color:"rgba(255,255,255,0.5)",marginBottom:6,fontWeight:600}}>FUTURES API KEY</div>
-            <input value={weexFuturesKey} onChange={e=>setWeexFuturesKey(e.target.value)} placeholder="Paste your Weex Futures API key" style={{width:"100%",background:"rgba(56,189,248,0.07)",border:"1px solid rgba(56,189,248,0.2)",borderRadius:12,padding:"11px 14px",color:"#fff",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
-          </div>
-          <div style={{marginBottom:16}}>
-            <div style={{fontSize:11,color:"rgba(255,255,255,0.5)",marginBottom:6,fontWeight:600}}>FUTURES API SECRET</div>
-            <input value={weexFuturesSecret} onChange={e=>setWeexFuturesSecret(e.target.value)} placeholder="Paste your Weex Futures API secret" type="password" style={{width:"100%",background:"rgba(56,189,248,0.07)",border:"1px solid rgba(56,189,248,0.2)",borderRadius:12,padding:"11px 14px",color:"#fff",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
-          </div>
         </div>
         <button onClick={connectWeex} disabled={connecting} style={{...gbtn("linear-gradient(135deg,#6c5ce7,#a78bfa)","#fff","transparent"),width:"100%",fontSize:14,padding:"12px",opacity:connecting?0.6:1}}>
           {connecting?"Connecting to Weex…":"🔗 Connect Weex Account"}
@@ -465,8 +452,6 @@ export default function App(){
   const [weexKey,    setWeexKey]        = useState("");
   const [weexSecret, setWeexSecret]     = useState("");
   const [weexPassphrase, setWeexPassphrase] = useState("");
-  const [weexFuturesKey,    setWeexFuturesKey]    = useState("");
-  const [weexFuturesSecret, setWeexFuturesSecret] = useState("");
   const [weexConnected,setWeexConnected]= useState(false);
   const [weexBalance, setWeexBalance]   = useState(null);
   const [connecting,  setConnecting]    = useState(false);
@@ -492,7 +477,7 @@ export default function App(){
   const modeRef = useRef(mode);
   useEffect(()=>{ modeRef.current = mode; },[mode]);
   // FIX: weexRef so live order logic always sees fresh credentials
-  const weexRef = useRef({connected:false,key:"",secret:"",passphrase:"",futuresKey:"",futuresSecret:""});
+  const weexRef = useRef({connected:false,key:"",secret:"",passphrase:""});
   const ts = ()=>new Date().toLocaleTimeString();
   const addLog = useCallback((msg,type="info")=>setLogs(l=>[{msg,type,ts:ts()},...l].slice(0,80)),[]);
 
@@ -522,7 +507,7 @@ export default function App(){
   },[positions,prices,addLog]);
 
   // keep weexRef in sync
-  useEffect(()=>{ weexRef.current = {connected:weexConnected, key:weexKey, secret:weexSecret, passphrase:weexPassphrase, futuresKey:weexFuturesKey, futuresSecret:weexFuturesSecret}; },[weexConnected,weexKey,weexSecret,weexPassphrase,weexFuturesKey,weexFuturesSecret]);
+  useEffect(()=>{ weexRef.current = {connected:weexConnected, key:weexKey, secret:weexSecret, passphrase:weexPassphrase}; },[weexConnected,weexKey,weexSecret,weexPassphrase]);
   // ── Fetch prices ────────────────────────────────────────────────────────────
   const loadPrices = useCallback(async()=>{
     try{
@@ -678,7 +663,7 @@ Reply with ONLY a valid JSON object and nothing else:
     if(!weexKey||!weexSecret){addLog("Enter API key and secret first","warn");return;}
     setConnecting(true);addLog("Connecting to Weex…","info");
     try{
-      const r=await fetch("https://shah-jee-proxy-production.up.railway.app/weex/balance",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:weexKey,secret:weexSecret,passphrase:weexPassphrase,futuresKey:weexFuturesKey,futuresSecret:weexFuturesSecret,futuresPassphrase:weexPassphrase}),signal:AbortSignal.timeout(15000)});
+      const r=await fetch("https://shah-jee-proxy-production.up.railway.app/weex/balance",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:weexKey,secret:weexSecret,passphrase:weexPassphrase}),signal:AbortSignal.timeout(15000)});
       if(!r.ok)throw new Error(`Proxy HTTP ${r.status}`);
       const d=await r.json();
       if(d.error)throw new Error(d.error);
@@ -917,7 +902,7 @@ Reply with ONLY a valid JSON object and nothing else:
       {tab==="chart"&&<ChartTab selPair={selPair} setSelPair={setSelPair} candles={candles} prices={prices} signals={signals} risks={risks} aiLoading={aiLoading} onAnalyze={analyze}/>}
       {tab==="positions"&&<PositionsTab positions={positions} prices={prices}/>}
       {tab==="trades"&&<TradesTab trades={trades} pnl={pnl}/>}
-      {tab==="weex"&&<WeexTab weexConnected={weexConnected} weexBalance={weexBalance} weexKey={weexKey} setWeexKey={setWeexKey} weexSecret={weexSecret} setWeexSecret={setWeexSecret} weexPassphrase={weexPassphrase} setWeexPassphrase={setWeexPassphrase} weexFuturesKey={weexFuturesKey} setWeexFuturesKey={setWeexFuturesKey} weexFuturesSecret={weexFuturesSecret} setWeexFuturesSecret={setWeexFuturesSecret} connecting={connecting} connectWeex={connectWeex} disconnectWeex={disconnectWeex} mode={mode} setMode={setMode}/>}
+      {tab==="weex"&&<WeexTab weexConnected={weexConnected} weexBalance={weexBalance} weexKey={weexKey} setWeexKey={setWeexKey} weexSecret={weexSecret} setWeexSecret={setWeexSecret} weexPassphrase={weexPassphrase} setWeexPassphrase={setWeexPassphrase} connecting={connecting} connectWeex={connectWeex} disconnectWeex={disconnectWeex} mode={mode} setMode={setMode}/>}
 
       {/* LOGS */}
       {tab==="logs"&&(
