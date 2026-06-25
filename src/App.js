@@ -667,21 +667,23 @@ Reply with ONLY a valid JSON object and nothing else:
       if(!r.ok)throw new Error(`Proxy HTTP ${r.status}`);
       const d=await r.json();
       if(d.error)throw new Error(d.error);
-      // Log what proxy found so user can debug in Logs tab
       if(d.debug&&d.debug.length){d.debug.slice(0,5).forEach(line=>addLog(`🔍 ${line.slice(0,120)}`,"info"));}
-      if(d.spotError){addLog(`⚠️ Spot balance issue: ${d.spotError}`,"warn");}
+      if(d.spotError){addLog(`⚠️ Spot: ${d.spotError}`,"warn");}
+      if(d.futuresError){addLog(`⚠️ Futures: ${d.futuresError}`,"warn");}
       setWeexBalance(d);
       setWeexConnected(true);
-      const spotUSDT=parseFloat(d.spot?.USDT?.available||0);
-      const spotBTC=parseFloat(d.spot?.BTC?.available||0);
-      const spotETH=parseFloat(d.spot?.ETH?.available||0);
-      const spotSOL=parseFloat(d.spot?.SOL?.available||0);
-      const hasSpot=Object.keys(d.spot||{}).length>0;
-      if(hasSpot){
-        setWallet({USDT:spotUSDT,BTC:spotBTC,ETH:spotETH,SOL:spotSOL});
-        addLog(`✅ Weex connected! USDT:$${spotUSDT.toFixed(2)} BTC:${spotBTC} ETH:${spotETH} SOL:${spotSOL}`,"buy");
+      const spotUSDT   = parseFloat(d.spot?.USDT?.available||0);
+      const spotBTC    = parseFloat(d.spot?.BTC?.available||0);
+      const spotETH    = parseFloat(d.spot?.ETH?.available||0);
+      const spotSOL    = parseFloat(d.spot?.SOL?.available||0);
+      // FIX: load futures USDT if spot is empty (user has funds in futures wallet)
+      const futureUSDT = parseFloat(d.futures?.USDT?.available||0);
+      const totalUSDT  = spotUSDT > 0 ? spotUSDT : futureUSDT;
+      if(totalUSDT > 0 || spotBTC > 0 || spotETH > 0 || spotSOL > 0){
+        setWallet({USDT:totalUSDT, BTC:spotBTC, ETH:spotETH, SOL:spotSOL});
+        addLog(`✅ Weex connected! USDT:$${totalUSDT.toFixed(2)} (${spotUSDT>0?"Spot":"Futures"}) BTC:${spotBTC} ETH:${spotETH} SOL:${spotSOL}`,"buy");
       }else{
-        addLog("✅ Weex API reached but spot balance empty — check Logs tab for API response details","warn");
+        addLog("✅ Weex connected — balance loading. Check Logs tab if futures wallet empty.","warn");
       }
     }catch(e){
       addLog(`⚠️ Weex connection failed: ${e.message} — check proxy is deployed on Railway`,"warn");
