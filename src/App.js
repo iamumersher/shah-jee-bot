@@ -1,21 +1,21 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????????????????????????????
 // CONSTANTS
-// ─────────────────────────────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????????????????????????????
 const PROXY    = "https://shah-jee-proxy-production.up.railway.app";
 const PAIRS    = ["BTC/USDT","ETH/USDT","SOL/USDT"];
 const GRAD     = {"BTC/USDT":["#f7931a","#ff6b00"],"ETH/USDT":["#627eea","#a78bfa"],"SOL/USDT":["#9945ff","#14f195"]};
-const ICON     = {"BTC/USDT":"₿","ETH/USDT":"Ξ","SOL/USDT":"◎"};
+const ICON     = {"BTC/USDT":"?","ETH/USDT":"?","SOL/USDT":"?"};
 const SEED     = {"BTC/USDT":61000,"ETH/USDT":1600,"SOL/USDT":67};
 const DP       = {"BTC/USDT":1,"ETH/USDT":2,"SOL/USDT":3};
 // Weex contract sizes (coins per contract)
 const CS       = {"BTC/USDT":0.001,"ETH/USDT":0.01,"SOL/USDT":0.1};
 const LEVERAGE = 10;
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????????????????????????????
 // TECHNICAL INDICATORS
-// ─────────────────────────────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????????????????????????????
 function iRSI(closes, p=14) {
   if (closes.length < p+1) return 50;
   let g=0, l=0;
@@ -67,9 +67,9 @@ function iVWAP(candles) {
   return s.reduce((a,c)=>a+(((c.h+c.l+c.c)/3)*c.v),0)/(tv||1);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????????????????????????????
 // POSITION SIZING  (1% risk, ATR-based SL, 10x leverage)
-// ─────────────────────────────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????????????????????????????
 function calcRisk(usdt, price, atr, side, pair) {
   const cs       = CS[pair] || 0.01;
   const slDist   = Math.max(atr*1.5, price*0.005);
@@ -97,9 +97,9 @@ function calcRisk(usdt, price, atr, side, pair) {
   };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????????????????????????????
 // CANDLE GENERATOR (simulation seed)
-// ─────────────────────────────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????????????????????????????
 function makeCandles(base, n=120) {
   let p=base;
   return Array.from({length:n},(_,i)=>{
@@ -109,10 +109,10 @@ function makeCandles(base, n=120) {
   });
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????????????????????????????
 // FORMATTING
-// ─────────────────────────────────────────────────────────────────────────────
-const fp = (pair,v) => v||v===0 ? Number(v).toLocaleString("en-US",{minimumFractionDigits:DP[pair],maximumFractionDigits:DP[pair]}) : "—";
+// ?????????????????????????????????????????????????????????????????????????????
+const fp = (pair,v) => v||v===0 ? Number(v).toLocaleString("en-US",{minimumFractionDigits:DP[pair],maximumFractionDigits:DP[pair]}) : "?";
 const SC = s => s==="BUY"?"#00ff88":s==="SELL"?"#ff4466":"#ffd700";
 const SB = s => s==="BUY"?"rgba(0,255,136,0.12)":s==="SELL"?"rgba(255,68,102,0.12)":"rgba(255,215,0,0.1)";
 const glass  = (ex={}) => ({background:"rgba(255,255,255,0.05)",backdropFilter:"blur(12px)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:18,padding:"14px 16px",marginBottom:12,...ex});
@@ -120,9 +120,9 @@ const mini   = (ex={}) => ({background:"rgba(255,255,255,0.06)",borderRadius:12,
 const pill   = (bg,c)  => ({fontSize:11,padding:"3px 10px",borderRadius:20,background:bg,color:c,fontWeight:600});
 const gbtn   = (bg,c,bd) => ({padding:"9px 20px",borderRadius:12,cursor:"pointer",fontWeight:600,fontSize:13,background:bg,color:c,border:`1.5px solid ${bd}`});
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????????????????????????????
 // SPARKLINE
-// ─────────────────────────────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????????????????????????????
 function Spark({data,colors,w=130,h=44}) {
   const ref=useRef();
   useEffect(()=>{
@@ -146,9 +146,9 @@ function Spark({data,colors,w=130,h=44}) {
   return <canvas ref={ref} width={w} height={h} style={{display:"block"}}/>;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????????????????????????????
 // TRADINGVIEW CHART
-// ─────────────────────────────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????????????????????????????
 function TVChart({pair,levels}) {
   const sym={"BTC/USDT":"BINANCE:BTCUSDT","ETH/USDT":"BINANCE:ETHUSDT","SOL/USDT":"BINANCE:SOLUSDT"}[pair];
   const dp=DP[pair];
@@ -177,9 +177,9 @@ function TVChart({pair,levels}) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????????????????????????????
 // EMERGENCY MODAL
-// ─────────────────────────────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????????????????????????????
 function EmergencyModal({show,done,loading,positions,prices,onConfirm,onClose}) {
   if(!show)return null;
   return(
@@ -188,7 +188,7 @@ function EmergencyModal({show,done,loading,positions,prices,onConfirm,onClose}) 
         {!done?(
           <>
             <div style={{textAlign:"center",marginBottom:20}}>
-              <div style={{fontSize:48,marginBottom:10}}>🚨</div>
+              <div style={{fontSize:48,marginBottom:10}}>?</div>
               <div style={{fontSize:20,fontWeight:800,color:"#ff0044",marginBottom:8}}>Emergency Stop</div>
               <div style={{fontSize:13,color:"rgba(255,255,255,0.55)",lineHeight:1.7}}>
                 Stops the bot and closes <b style={{color:"#fff"}}>ALL open positions</b> at market price on Weex immediately.
@@ -198,7 +198,7 @@ function EmergencyModal({show,done,loading,positions,prices,onConfirm,onClose}) 
                   {Object.entries(positions).map(([pair,pos])=>{
                     const price=prices[pair]||0;
                     const unreal=(price-pos.entry)*pos.qty*(pos.side==="BUY"?1:-1);
-                    return <div key={pair} style={{marginTop:4}}>{pair} {pos.side} — {unreal>=0?"+":""}${unreal.toFixed(2)}</div>;
+                    return <div key={pair} style={{marginTop:4}}>{pair} {pos.side} ? {unreal>=0?"+":""}${unreal.toFixed(2)}</div>;
                   })}
                 </div>
               )}
@@ -206,13 +206,13 @@ function EmergencyModal({show,done,loading,positions,prices,onConfirm,onClose}) 
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
               <button onClick={onClose} style={{padding:"12px",borderRadius:12,cursor:"pointer",fontWeight:700,fontSize:14,background:"rgba(255,255,255,0.07)",color:"rgba(255,255,255,0.6)",border:"1px solid rgba(255,255,255,0.15)"}}>Cancel</button>
               <button onClick={onConfirm} disabled={loading} style={{padding:"12px",borderRadius:12,cursor:"pointer",fontWeight:800,fontSize:14,background:"linear-gradient(135deg,#ff0044,#ff4466)",color:"#fff",border:"none",opacity:loading?0.7:1}}>
-                {loading?"Closing…":"🚨 CONFIRM"}
+                {loading?"Closing?":"? CONFIRM"}
               </button>
             </div>
           </>
         ):(
           <div style={{textAlign:"center",padding:"10px 0"}}>
-            <div style={{fontSize:48,marginBottom:12}}>✅</div>
+            <div style={{fontSize:48,marginBottom:12}}>?</div>
             <div style={{fontSize:18,fontWeight:800,color:"#00ff88",marginBottom:8}}>All Stopped</div>
             <div style={{fontSize:13,color:"rgba(255,255,255,0.5)",marginBottom:20}}>Bot stopped. All positions closed on Weex.</div>
             <button onClick={onClose} style={{padding:"10px 28px",borderRadius:12,cursor:"pointer",fontWeight:700,background:"rgba(0,255,136,0.15)",color:"#00ff88",border:"1px solid rgba(0,255,136,0.35)",fontSize:14}}>Close</button>
@@ -223,14 +223,14 @@ function EmergencyModal({show,done,loading,positions,prices,onConfirm,onClose}) 
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????????????????????????????
 // WEEX TAB
-// ─────────────────────────────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????????????????????????????
 function WeexTab({weexConnected,weexBalance,weexKey,setWeexKey,weexSecret,setWeexSecret,weexPassphrase,setWeexPassphrase,connecting,connectWeex,disconnectWeex}) {
   if(!weexConnected)return(
     <div>
       <div style={{...glass({background:"linear-gradient(135deg,rgba(108,92,231,0.2),rgba(56,189,248,0.1))",marginBottom:16})}}>
-        <div style={{fontSize:16,fontWeight:700,marginBottom:6}}>🔗 Connect Your Weex Account</div>
+        <div style={{fontSize:16,fontWeight:700,marginBottom:6}}>? Connect Your Weex Account</div>
         <div style={{fontSize:13,color:"rgba(255,255,255,0.5)",lineHeight:1.7}}>One API key covers both Spot and Futures wallets. Enable <b style={{color:"#fff"}}>Read + Trade (Futures)</b> permissions.</div>
       </div>
       <div style={glass()}>
@@ -242,10 +242,10 @@ function WeexTab({weexConnected,weexBalance,weexKey,setWeexKey,weexSecret,setWee
           </div>
         ))}
         <button onClick={connectWeex} disabled={connecting} style={{...gbtn("linear-gradient(135deg,#6c5ce7,#a78bfa)","#fff","transparent"),width:"100%",fontSize:14,padding:"12px",opacity:connecting?0.6:1}}>
-          {connecting?"Connecting…":"🔗 Connect Weex Account"}
+          {connecting?"Connecting?":"? Connect Weex Account"}
         </button>
         <div style={{marginTop:12,padding:"10px 12px",background:"rgba(255,215,0,0.08)",borderRadius:10,border:"1px solid rgba(255,215,0,0.2)",fontSize:12,color:"rgba(255,215,0,0.8)"}}>
-          ⚠️ Read + Trade only. Never enable Withdraw permission.
+          ?? Read + Trade only. Never enable Withdraw permission.
         </div>
       </div>
     </div>
@@ -255,10 +255,10 @@ function WeexTab({weexConnected,weexBalance,weexKey,setWeexKey,weexSecret,setWee
     <div>
       <div style={{...glass({background:"linear-gradient(135deg,rgba(0,255,136,0.12),rgba(56,189,248,0.08))",borderColor:"rgba(0,255,136,0.3)",marginBottom:16})}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <div style={{width:40,height:40,borderRadius:12,background:"rgba(0,255,136,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>✅</div>
+          <div style={{width:40,height:40,borderRadius:12,background:"rgba(0,255,136,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>?</div>
           <div>
             <div style={{fontSize:15,fontWeight:700,color:"#00ff88"}}>Weex Connected</div>
-            <div style={{fontSize:11,color:"rgba(255,255,255,0.4)"}}>Live balance · 1% risk per trade · 10x leverage</div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,0.4)"}}>Live balance ? 1% risk per trade ? 10x leverage</div>
           </div>
         </div>
       </div>
@@ -295,14 +295,14 @@ function WeexTab({weexConnected,weexBalance,weexKey,setWeexKey,weexSecret,setWee
         )}
         {(!weexBalance?.futures||Object.keys(weexBalance.futures).length===0)&&(
           <div style={{padding:"12px",background:"rgba(255,215,0,0.08)",borderRadius:10,border:"1px solid rgba(255,215,0,0.2)",fontSize:12,color:"#ffd700",marginTop:8}}>
-            ⚠️ Futures wallet empty or not found. Check Logs tab for details.
+            ?? Futures wallet empty or not found. Check Logs tab for details.
           </div>
         )}
       </div>
 
       <div style={glass()}>
         <div style={{fontSize:13,fontWeight:700,marginBottom:10}}>Risk Management</div>
-        {[["Risk/trade","1% of total wallet"],["Leverage","10x (futures)"],["Stop Loss","1.5× ATR"],["TP1 / TP2 / TP3","2× / 3.5× / 5× ATR"],["Min AI Confidence","65%"],["Max per pair","1 position"]].map(([l,v])=>(
+        {[["Risk/trade","1% of total wallet"],["Leverage","10x (futures)"],["Stop Loss","1.5? ATR"],["TP1 / TP2 / TP3","2? / 3.5? / 5? ATR"],["Min AI Confidence","65%"],["Max per pair","1 position"]].map(([l,v])=>(
           <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,0.06)",fontSize:12}}>
             <span style={{color:"rgba(255,255,255,0.45)"}}>{l}</span><span style={{fontWeight:600}}>{v}</span>
           </div>
@@ -311,7 +311,7 @@ function WeexTab({weexConnected,weexBalance,weexKey,setWeexKey,weexSecret,setWee
 
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
         <button onClick={connectWeex} disabled={connecting} style={{...gbtn("rgba(0,255,136,0.15)","#00ff88","rgba(0,255,136,0.3)"),padding:"11px",textAlign:"center",opacity:connecting?0.6:1}}>
-          {connecting?"Loading…":"🔄 Refresh Balance"}
+          {connecting?"Loading?":"? Refresh Balance"}
         </button>
         <button onClick={disconnectWeex} style={{...gbtn("rgba(255,68,102,0.15)","#ff4466","rgba(255,68,102,0.3)"),padding:"11px",textAlign:"center"}}>Disconnect</button>
       </div>
@@ -319,9 +319,9 @@ function WeexTab({weexConnected,weexBalance,weexKey,setWeexKey,weexSecret,setWee
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????????????????????????????
 // MAIN APP
-// ─────────────────────────────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????????????????????????????
 export default function App() {
   const [tab,setTab]       = useState("markets");
   const [selPair,setSelPair] = useState("BTC/USDT");
@@ -370,7 +370,7 @@ export default function App() {
   const ts    = () => new Date().toLocaleTimeString();
   const addLog = useCallback((msg,type="info") => setLogs(l=>[{msg,type,ts:ts()},...l].slice(0,100)),[]);
 
-  // ── Portfolio value ──────────────────────────────────────────────────────────
+  // ?? Portfolio value ??????????????????????????????????????????????????????????
   const totalVal = useCallback(()=>{
     let t=walletRef.current.USDT;
     PAIRS.forEach(p=>{ t+=(walletRef.current[p.split("/")[0]]||0)*(prices[p]||0); });
@@ -382,7 +382,7 @@ export default function App() {
     if(tv>0) setPnlHist(h=>[...h.slice(-99),tv]);
   },[prices,wallet]);
 
-  // ── Live prices ──────────────────────────────────────────────────────────────
+  // ?? Live prices ??????????????????????????????????????????????????????????????
   const loadPrices = useCallback(async()=>{
     try {
       const r=await fetch(`${PROXY}/prices`,{signal:AbortSignal.timeout(5000)});
@@ -404,7 +404,7 @@ export default function App() {
         });
       }
     } catch {
-      // Simulation drift — only if not connected to Weex
+      // Simulation drift ? only if not connected to Weex
       if(!weexRef.current.connected){
         setPrices(prev=>{const next={};for(const p of PAIRS){const d=(Math.random()-0.5)*prev[p]*0.001;next[p]=Math.max(prev[p]*0.95,prev[p]+d);}return next;});
         setPriceSource("Simulation");
@@ -414,7 +414,7 @@ export default function App() {
 
   useEffect(()=>{ loadPrices(); const iv=setInterval(loadPrices,8000); return()=>clearInterval(iv); },[loadPrices]);
 
-  // ── Candle tick (paper mode only) ───────────────────────────────────────────
+  // ?? Candle tick (paper mode only) ???????????????????????????????????????????
   useEffect(()=>{
     const iv=setInterval(()=>{
       if(weexRef.current.connected) return; // don't drift when live
@@ -433,7 +433,7 @@ export default function App() {
     return()=>clearInterval(iv);
   },[]);
 
-  // ── SL / TP monitor ─────────────────────────────────────────────────────────
+  // ?? SL / TP monitor ?????????????????????????????????????????????????????????
   useEffect(()=>{
     Object.entries(positions).forEach(([pair,pos])=>{
       const price=prices[pair]; if(!price)return;
@@ -450,7 +450,7 @@ export default function App() {
     });
   },[prices]);
 
-  // ── AI ANALYZE — Best multi-strategy prompt ──────────────────────────────────
+  // ?? AI ANALYZE ? Best multi-strategy prompt ??????????????????????????????????
   const analyze = useCallback(async(pair)=>{
     let cd=candles[pair];
     if(!cd||cd.length<30){cd=makeCandles(prices[pair]||SEED[pair]);setCandles(prev=>({...prev,[pair]:cd}));}
@@ -529,7 +529,7 @@ For HOLD: {"signal":"HOLD","confidence":45,"strategy":"No Setup","reason":"Brief
       setRisks(r=>({...r,[pair]:rsk}));
       addLog(`[BOT] AI -> ${pair}: ${sig.signal} ${sig.confidence}% | ${sig.strategy}`,sig.signal==="BUY"?"buy":sig.signal==="SELL"?"sell":"info");
 
-      // Only trade if: signal is actionable, confidence ≥ 65, no existing position, bot running
+      // Only trade if: signal is actionable, confidence ? 65, no existing position, bot running
       // In live mode: must be connected to Weex with real balance
       const isLive   = modeRef.current==="live";
       const canTrade = !isLive || (weexRef.current.connected && walletRef.current.USDT > 0);
@@ -591,7 +591,7 @@ For HOLD: {"signal":"HOLD","confidence":45,"strategy":"No Setup","reason":"Brief
     setAiLoading(l=>({...l,[pair]:false}));
   },[candles,prices,positions,running,addLog]);
 
-  // ── Bot loop ─────────────────────────────────────────────────────────────────
+  // ?? Bot loop ?????????????????????????????????????????????????????????????????
   useEffect(()=>{
     if(running){
       const isLive=modeRef.current==="live";
@@ -630,11 +630,11 @@ For HOLD: {"signal":"HOLD","confidence":45,"strategy":"No Setup","reason":"Brief
     return()=>clearInterval(aiTimer.current);
   },[running]);
 
-  // ── Weex connect ─────────────────────────────────────────────────────────────
+  //  Weex connect 
   const connectWeex = useCallback(async()=>{
     if(!weexKey||!weexSecret){addLog("Enter API key and secret first","warn");return;}
     setConnecting(true);
-    addLog("Connecting to Weex…","info");
+    addLog("Connecting to Weex...","info");
     try {
       const r=await fetch(`${PROXY}/weex/balance`,{
         method:"POST",
@@ -642,9 +642,9 @@ For HOLD: {"signal":"HOLD","confidence":45,"strategy":"No Setup","reason":"Brief
         body:JSON.stringify({key:weexKey,secret:weexSecret,passphrase:weexPassphrase}),
         signal:AbortSignal.timeout(15000)
       });
-      if(!r.ok) throw new Error(`Proxy HTTP ${r.status} — is Railway deployed?`);
+      if(!r.ok) throw new Error(`Proxy HTTP ${r.status} ? is Railway deployed?`);
       const d=await r.json();
-      if(d.debug) d.debug.slice(0,6).forEach(line=>addLog(`🔍 ${line.slice(0,130)}`,"info"));
+      if(d.debug) d.debug.slice(0,6).forEach(line=>addLog(`? ${line.slice(0,130)}`,"info"));
       if(d.error) throw new Error(d.error);
 
       setWeexBalance(d);
@@ -664,7 +664,7 @@ For HOLD: {"signal":"HOLD","confidence":45,"strategy":"No Setup","reason":"Brief
         setStartBal(totalUSDT);
         setPnlHist([totalUSDT]);
         addLog(`[OK] Weex connected! USDT:$${totalUSDT.toFixed(2)} (${spotUSDT>0?"Spot":"Futures"}) BTC:${spotBTC} ETH:${spotETH} SOL:${spotSOL}`,"buy");
-        if(futureUSDT>0) addLog(`[MONEY] Futures USDT available: $${futureUSDT} — bot will trade with this`,"buy");
+        if(futureUSDT>0) addLog(`[MONEY] Futures USDT available: $${futureUSDT} ? bot will trade with this`,"buy");
       } else {
         addLog("[OK] Weex API connected -- all balances are zero. Add funds to your futures wallet.","warn");
         setStartBal(0);
@@ -685,12 +685,12 @@ For HOLD: {"signal":"HOLD","confidence":45,"strategy":"No Setup","reason":"Brief
     addLog("Weex disconnected","warn");
   };
 
-  // ── Emergency Stop ───────────────────────────────────────────────────────────
+  //  Emergency Stop 
   const executeEmergencyStop = useCallback(async()=>{
     setEmergencyLoading(true);
     setRunning(false);
     clearInterval(aiTimer.current);
-    addLog("[!!] EMERGENCY STOP -- stopping bot and closing all positions…","loss");
+    addLog("[!!] EMERGENCY STOP -- stopping bot and closing all positions...","loss");
 
     // Close all on Weex first (one call closes everything)
     if(modeRef.current==="live" && weexRef.current.connected) {
@@ -718,7 +718,7 @@ For HOLD: {"signal":"HOLD","confidence":45,"strategy":"No Setup","reason":"Brief
     setEmergencyLoading(false); setEmergencyDone(true);
   },[positions,prices,addLog]);
 
-  // ── Derived values ───────────────────────────────────────────────────────────
+  //  Derived values 
   const tv=totalVal();
   const pnl=startBal>0?tv-startBal:0;
   const pnlPct=startBal>0?((pnl/startBal)*100).toFixed(2):"0.00";
@@ -734,20 +734,20 @@ For HOLD: {"signal":"HOLD","confidence":45,"strategy":"No Setup","reason":"Brief
       {/* Header */}
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <div style={{width:42,height:42,borderRadius:12,background:"linear-gradient(135deg,#6c5ce7,#a78bfa)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,boxShadow:"0 4px 15px rgba(108,92,231,0.5)"}}>👑</div>
+          <div style={{width:42,height:42,borderRadius:12,background:"linear-gradient(135deg,#6c5ce7,#a78bfa)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,boxShadow:"0 4px 15px rgba(108,92,231,0.5)"}}></div>
           <div>
             <div style={{fontWeight:800,fontSize:16,background:"linear-gradient(90deg,#ffd700,#ff6b00,#a78bfa)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>Shah Jee Trading Bot</div>
             <div style={{fontSize:11,color:"rgba(255,255,255,0.4)",display:"flex",alignItems:"center",gap:6}}>
               <span style={{width:6,height:6,borderRadius:"50%",background:isLive?"#00ff88":"#ffd700",display:"inline-block",boxShadow:isLive?"0 0 6px #00ff88":"none"}}/>
               {priceSource}
-              {weexConnected&&<span style={{color:"#00ff88",fontWeight:600}}>· Weex ✓</span>}
+              {weexConnected&&<span style={{color:"#00ff88",fontWeight:600}}> Weex </span>}
             </div>
           </div>
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
           <span style={{...pill(mode==="paper"?"rgba(0,255,136,0.15)":"rgba(255,68,102,0.15)",mode==="paper"?"#00ff88":"#ff4466")}}>{mode==="paper"?"Paper":"Live"}</span>
           <button onClick={()=>setRunning(r=>!r)} style={{...gbtn(running?"rgba(255,68,102,0.2)":"rgba(0,255,136,0.2)",running?"#ff4466":"#00ff88",running?"#ff446650":"#00ff8850")}}>
-            {running?"⏹ Stop":"> Start Bot"}
+            {running?" Stop":"> Start Bot"}
           </button>
         </div>
       </div>
@@ -756,12 +756,12 @@ For HOLD: {"signal":"HOLD","confidence":45,"strategy":"No Setup","reason":"Brief
       <div style={{display:"flex",gap:3,marginBottom:14,background:"rgba(255,255,255,0.05)",borderRadius:14,padding:4,overflowX:"auto"}}>
         {TABS.map(t=>(
           <button key={t} onClick={()=>setTab(t)} style={{flex:"0 0 auto",padding:"7px 12px",borderRadius:10,cursor:"pointer",fontSize:11,fontWeight:tab===t?700:400,color:tab===t?"#fff":"rgba(255,255,255,0.4)",background:tab===t?"linear-gradient(135deg,rgba(108,92,231,0.6),rgba(167,139,250,0.4))":"transparent",border:"none",textTransform:"capitalize",whiteSpace:"nowrap"}}>
-            {t==="weex"?"🔗 Weex":t==="signals"?"[~] Signals":t}
+            {t==="weex"?" Weex":t==="signals"?"[~] Signals":t}
           </button>
         ))}
       </div>
 
-      {/* ── MARKETS ── */}
+      {/*  MARKETS  */}
       {tab==="markets"&&(
         <div>
           {/* Portfolio card */}
@@ -805,11 +805,11 @@ For HOLD: {"signal":"HOLD","confidence":45,"strategy":"No Setup","reason":"Brief
                       <div style={{width:34,height:34,borderRadius:10,background:`linear-gradient(135deg,${c1},${c2})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:700}}>{ICON[pair]}</div>
                       <span style={{fontWeight:700,fontSize:15}}>{pair}</span>
                       {pos&&<span style={{...pill(pos.side==="BUY"?"rgba(0,255,136,0.15)":"rgba(255,68,102,0.15)",pos.side==="BUY"?"#00ff88":"#ff4466")}}>{pos.side}</span>}
-                      {aiLoading[pair]&&<span style={{fontSize:10,color:"#a78bfa"}}>Analyzing…</span>}
+                      {aiLoading[pair]&&<span style={{fontSize:10,color:"#a78bfa"}}>Analyzing...</span>}
                       {sig&&!aiLoading[pair]&&<span style={{...pill(SB(sig.signal),SC(sig.signal)),border:`1px solid ${SC(sig.signal)}44`}}>{sig.signal} {sig.confidence}%</span>}
                     </div>
                     <div style={{fontSize:28,fontWeight:800,letterSpacing:-0.5,background:`linear-gradient(90deg,${c1},${c2})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",marginBottom:4}}>
-                      ${price>0?price.toLocaleString("en-US",{minimumFractionDigits:DP[pair],maximumFractionDigits:DP[pair]}):"Loading…"}
+                      ${price>0?price.toLocaleString("en-US",{minimumFractionDigits:DP[pair],maximumFractionDigits:DP[pair]}):"Loading..."}
                     </div>
                     <div style={{fontSize:12,color:chg>=0?"#00ff88":"#ff4466",fontWeight:600,marginBottom:6}}>{chg>=0?"^":"v"} {Math.abs(chg).toFixed(3)}%</div>
                     {sig&&!aiLoading[pair]&&<p style={{margin:"0 0 6px",fontSize:12,color:"rgba(255,255,255,0.55)",lineHeight:1.5}}>{sig.reason}</p>}
@@ -842,7 +842,7 @@ For HOLD: {"signal":"HOLD","confidence":45,"strategy":"No Setup","reason":"Brief
         </div>
       )}
 
-      {/* ── SIGNALS ── */}
+      {/*  SIGNALS  */}
       {tab==="signals"&&(
         <div>
           {PAIRS.map(pair=>{
@@ -857,13 +857,13 @@ For HOLD: {"signal":"HOLD","confidence":45,"strategy":"No Setup","reason":"Brief
                     <div style={{width:38,height:38,borderRadius:11,background:`linear-gradient(135deg,${c1},${c2})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:700}}>{ICON[pair]}</div>
                     <div>
                       <div style={{fontWeight:700,fontSize:15}}>{pair}</div>
-                      <div style={{fontSize:12,color:"rgba(255,255,255,0.4)"}}>15m · ${price>0?price.toLocaleString("en-US",{minimumFractionDigits:dp,maximumFractionDigits:dp}):"--"}</div>
+                      <div style={{fontSize:12,color:"rgba(255,255,255,0.4)"}}>15m  ${price>0?price.toLocaleString("en-US",{minimumFractionDigits:dp,maximumFractionDigits:dp}):"--"}</div>
                     </div>
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:8}}>
                     {sig&&<span style={{...pill(SB(sig.signal),SC(sig.signal)),fontSize:13,padding:"5px 14px"}}>{sig.signal} {sig.confidence}%</span>}
                     <button onClick={e=>{e.stopPropagation();analyze(pair);}} disabled={!!aiLoading[pair]} style={{...gbtn("rgba(108,92,231,0.25)","#a78bfa","rgba(108,92,231,0.5)"),padding:"6px 14px",fontSize:12,opacity:aiLoading[pair]?0.5:1}}>
-                      {aiLoading[pair]?"…":"Analyze"}
+                      {aiLoading[pair]?"...":"Analyze"}
                     </button>
                   </div>
                 </div>
@@ -874,7 +874,7 @@ For HOLD: {"signal":"HOLD","confidence":45,"strategy":"No Setup","reason":"Brief
                       <span style={{...pill("rgba(255,255,255,0.07)","rgba(255,255,255,0.6)")}}>{sig.bias}</span>
                       <span style={{...pill("rgba(255,255,255,0.07)","rgba(255,255,255,0.4)")}}>{sig.ts}</span>
                     </div>
-                    <div style={{background:"rgba(0,0,0,0.2)",borderRadius:10,padding:"10px 12px",marginBottom:12,fontSize:13,color:"rgba(255,255,255,0.65)",lineHeight:1.6}}>💬 {sig.reason}</div>
+                    <div style={{background:"rgba(0,0,0,0.2)",borderRadius:10,padding:"10px 12px",marginBottom:12,fontSize:13,color:"rgba(255,255,255,0.65)",lineHeight:1.6}}> {sig.reason}</div>
                     {sig.signal!=="HOLD"&&rsk&&(
                       <>
                         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
@@ -883,7 +883,7 @@ For HOLD: {"signal":"HOLD","confidence":45,"strategy":"No Setup","reason":"Brief
                             <div style={{fontSize:20,fontWeight:800}}>${Number(sig.entry).toFixed(dp)}</div>
                           </div>
                           <div style={{background:"rgba(255,68,102,0.1)",borderRadius:12,padding:"10px 12px",border:"1px solid rgba(255,68,102,0.25)"}}>
-                            <div style={{fontSize:10,color:"#ff4466",marginBottom:4,fontWeight:600}}>🛑 STOP LOSS</div>
+                            <div style={{fontSize:10,color:"#ff4466",marginBottom:4,fontWeight:600}}> STOP LOSS</div>
                             <div style={{fontSize:20,fontWeight:800,color:"#ff4466"}}>${Number(sig.sl).toFixed(dp)}</div>
                             <div style={{fontSize:10,color:"rgba(255,68,102,0.6)"}}>Max loss: -${rsk.risk}</div>
                           </div>
@@ -928,7 +928,7 @@ For HOLD: {"signal":"HOLD","confidence":45,"strategy":"No Setup","reason":"Brief
         </div>
       )}
 
-      {/* ── CHART ── */}
+      {/*  CHART  */}
       {tab==="chart"&&(
         <div>
           <div style={{display:"flex",gap:6,marginBottom:12}}>
@@ -971,24 +971,24 @@ For HOLD: {"signal":"HOLD","confidence":45,"strategy":"No Setup","reason":"Brief
                     <span style={{fontWeight:700}}>AI Signal <span style={{fontSize:11,color:"rgba(255,255,255,0.4)",fontWeight:400}}>{sig.ts}</span></span>
                     <span style={{...pill(SB(sig.signal),SC(sig.signal)),fontSize:13,padding:"4px 14px"}}>{sig.signal} {sig.confidence}%</span>
                   </div>
-                  <div style={{fontSize:11,color:"#a78bfa",fontWeight:600,marginBottom:5}}>{sig.strategy} · {sig.bias}</div>
+                  <div style={{fontSize:11,color:"#a78bfa",fontWeight:600,marginBottom:5}}>{sig.strategy}  {sig.bias}</div>
                   <div style={{fontSize:13,color:"rgba(255,255,255,0.6)",lineHeight:1.6}}>{sig.reason}</div>
                   {rsk&&sig.signal!=="HOLD"&&(
                     <div style={{marginTop:10,padding:"8px 12px",background:"rgba(108,92,231,0.2)",borderRadius:10,border:"1px solid rgba(108,92,231,0.3)",fontSize:12,color:"#a78bfa"}}>
-                      Risk <b>${rsk.risk}</b> · Margin <b>${rsk.pos}</b> · Qty <b>{rsk.qty} {pair.split("/")[0]}</b> · R:R <b>{rsk.rr}:1</b>
+                      Risk <b>${rsk.risk}</b>  Margin <b>${rsk.pos}</b>  Qty <b>{rsk.qty} {pair.split("/")[0]}</b>  R:R <b>{rsk.rr}:1</b>
                     </div>
                   )}
                 </div>
               )}
               <button onClick={()=>analyze(pair)} disabled={!!aiLoading[pair]} style={{...gbtn("linear-gradient(135deg,rgba(108,92,231,0.4),rgba(167,139,250,0.3))","#a78bfa","rgba(108,92,231,0.5)"),width:"100%",marginBottom:10,opacity:aiLoading[pair]?0.5:1}}>
-                {aiLoading[pair]?"Analyzing…":"Re-analyze with Claude AI ↗"}
+                {aiLoading[pair]?"Analyzing...":"Re-analyze with Claude AI "}
               </button>
             </>);
           })()}
         </div>
       )}
 
-      {/* ── POSITIONS ── */}
+      {/*  POSITIONS  */}
       {tab==="positions"&&(
         <div>
           {Object.keys(positions).length===0
@@ -1020,7 +1020,7 @@ For HOLD: {"signal":"HOLD","confidence":45,"strategy":"No Setup","reason":"Brief
                       <span style={{color:"#ff4466"}}>SL ${Number(pos.sl).toFixed(dp)}</span>
                       <span style={{color:"#00ff88"}}>TP2 ${Number(pos.tp2).toFixed(dp)}</span>
                     </div>
-                    <div style={{fontSize:11,color:"#a78bfa"}}>Strategy: {pos.strategy} · Risk: ${pos.rAmt?.toFixed(2)}</div>
+                    <div style={{fontSize:11,color:"#a78bfa"}}>Strategy: {pos.strategy}  Risk: ${pos.rAmt?.toFixed(2)}</div>
                   </div>
                 );
               })
@@ -1028,7 +1028,7 @@ For HOLD: {"signal":"HOLD","confidence":45,"strategy":"No Setup","reason":"Brief
         </div>
       )}
 
-      {/* ── TRADES ── */}
+      {/*  TRADES  */}
       {tab==="trades"&&(
         <div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:12}}>
@@ -1044,11 +1044,11 @@ For HOLD: {"signal":"HOLD","confidence":45,"strategy":"No Setup","reason":"Brief
                   <div key={tr.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
                     <div style={{display:"flex",alignItems:"center",gap:10}}>
                       <div style={{width:30,height:30,borderRadius:8,background:tr.action==="BUY"||tr.action==="TP2"?"rgba(0,255,136,0.15)":tr.action==="EMERGENCY CLOSE"?"rgba(255,0,60,0.15)":"rgba(255,68,102,0.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>
-                        {tr.action==="EMERGENCY CLOSE"?"[!!]":tr.action.includes("BUY")||tr.action==="TP2"?"↑":"↓"}
+                        {tr.action==="EMERGENCY CLOSE"?"[!!]":tr.action.includes("BUY")||tr.action==="TP2"?"":""}
                       </div>
                       <div>
                         <div style={{fontWeight:600,fontSize:13}}>{tr.action} {tr.pair}</div>
-                        <div style={{fontSize:10,color:"rgba(255,255,255,0.35)"}}>{tr.ts}{tr.strat?" · "+tr.strat:""}{tr.conf?" · "+tr.conf+"%":""}</div>
+                        <div style={{fontSize:10,color:"rgba(255,255,255,0.35)"}}>{tr.ts}{tr.strat?"  "+tr.strat:""}{tr.conf?"  "+tr.conf+"%":""}</div>
                       </div>
                     </div>
                     <div style={{textAlign:"right"}}>
@@ -1062,10 +1062,10 @@ For HOLD: {"signal":"HOLD","confidence":45,"strategy":"No Setup","reason":"Brief
         </div>
       )}
 
-      {/* ── WEEX ── */}
+      {/*  WEEX  */}
       {tab==="weex"&&<WeexTab weexConnected={weexConnected} weexBalance={weexBalance} weexKey={weexKey} setWeexKey={setWeexKey} weexSecret={weexSecret} setWeexSecret={setWeexSecret} weexPassphrase={weexPassphrase} setWeexPassphrase={setWeexPassphrase} connecting={connecting} connectWeex={connectWeex} disconnectWeex={disconnectWeex}/>}
 
-      {/* ── LOGS ── */}
+      {/*  LOGS  */}
       {tab==="logs"&&(
         <div style={glass()}>
           <div style={{fontWeight:700,marginBottom:12}}>Activity Log</div>
@@ -1079,24 +1079,24 @@ For HOLD: {"signal":"HOLD","confidence":45,"strategy":"No Setup","reason":"Brief
         </div>
       )}
 
-      {/* ── SETTINGS ── */}
+      {/*  SETTINGS  */}
       {tab==="settings"&&(
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
           <div style={glass()}>
             <div style={{fontWeight:700,marginBottom:12}}>Trading Mode</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-              {[["paper","📄 Paper","Simulated -- safe to test","#00ff88"],["live","[!] Live","Real Weex orders","#ff4466"]].map(([m,t,s,c])=>(
+              {[["paper"," Paper","Simulated -- safe to test","#00ff88"],["live","[!] Live","Real Weex orders","#ff4466"]].map(([m,t,s,c])=>(
                 <button key={m} onClick={()=>setMode(m)} style={{padding:12,borderRadius:12,cursor:"pointer",background:mode===m?`${c}18`:"rgba(255,255,255,0.05)",border:`1.5px solid ${mode===m?c+"60":"rgba(255,255,255,0.1)"}`,textAlign:"left"}}>
                   <div style={{fontWeight:700,color:mode===m?c:"#fff",marginBottom:3}}>{t}</div>
                   <div style={{fontSize:11,color:"rgba(255,255,255,0.4)"}}>{s}</div>
                 </button>
               ))}
             </div>
-            {mode==="live"&&!weexConnected&&<div style={{marginTop:10,padding:"10px",background:"rgba(255,68,102,0.1)",borderRadius:10,border:"1px solid rgba(255,68,102,0.3)",fontSize:12,color:"#ff4466"}}>⚠️ Connect Weex in the 🔗 Weex tab first</div>}
+            {mode==="live"&&!weexConnected&&<div style={{marginTop:10,padding:"10px",background:"rgba(255,68,102,0.1)",borderRadius:10,border:"1px solid rgba(255,68,102,0.3)",fontSize:12,color:"#ff4466"}}>?? Connect Weex in the ? Weex tab first</div>}
           </div>
           <div style={glass()}>
             <div style={{fontWeight:700,marginBottom:10}}>Bot Configuration</div>
-            {[["Pairs","BTC/USDT · ETH/USDT · SOL/USDT"],["Timeframe","15 minutes"],["AI Engine","Claude claude-sonnet-4-6 (via proxy)"],["Analysis interval","Every 90 seconds"],["Risk per trade","1% of wallet"],["Leverage","10x futures"],["Stop Loss","1.5× ATR"],["Take Profits","TP1=2× TP2=3.5× TP3=5× ATR"],["Min AI confidence","65%"],["Max positions","1 per pair"],["Contract sizes","BTC=0.001 · ETH=0.01 · SOL=0.1"]].map(([l,v])=>(
+            {[["Pairs","BTC/USDT ? ETH/USDT ? SOL/USDT"],["Timeframe","15 minutes"],["AI Engine","Claude claude-sonnet-4-6 (via proxy)"],["Analysis interval","Every 90 seconds"],["Risk per trade","1% of wallet"],["Leverage","10x futures"],["Stop Loss","1.5? ATR"],["Take Profits","TP1=2? TP2=3.5? TP3=5? ATR"],["Min AI confidence","65%"],["Max positions","1 per pair"],["Contract sizes","BTC=0.001 ? ETH=0.01 ? SOL=0.1"]].map(([l,v])=>(
               <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,0.05)",fontSize:12}}>
                 <span style={{color:"rgba(255,255,255,0.45)"}}>{l}</span><span style={{fontWeight:600,color:"#a78bfa"}}>{v}</span>
               </div>
@@ -1104,7 +1104,7 @@ For HOLD: {"signal":"HOLD","confidence":45,"strategy":"No Setup","reason":"Brief
           </div>
           <div style={glass()}>
             <div style={{fontWeight:700,marginBottom:10}}>AI Strategies Used</div>
-            {[["EMA Crossover","EMA9 × EMA21 with EMA50 trend filter"],["RSI Extremes","Overbought >70 / Oversold <30 reversals"],["BB Breakout","Bollinger band squeeze and breakout"],["VWAP Bounce","Price returning to VWAP from extremes"],["MACD Momentum","MACD cross with trend confirmation"],["Multi-confluence","Requires 3+ indicators to agree"]].map(([l,v])=>(
+            {[["EMA Crossover","EMA9 ? EMA21 with EMA50 trend filter"],["RSI Extremes","Overbought >70 / Oversold <30 reversals"],["BB Breakout","Bollinger band squeeze and breakout"],["VWAP Bounce","Price returning to VWAP from extremes"],["MACD Momentum","MACD cross with trend confirmation"],["Multi-confluence","Requires 3+ indicators to agree"]].map(([l,v])=>(
               <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,0.05)",fontSize:12}}>
                 <span style={{color:"rgba(255,255,255,0.45)"}}>{l}</span><span style={{fontSize:11,color:"rgba(255,255,255,0.5)",maxWidth:"55%",textAlign:"right"}}>{v}</span>
               </div>
@@ -1116,12 +1116,12 @@ For HOLD: {"signal":"HOLD","confidence":45,"strategy":"No Setup","reason":"Brief
       {/* Emergency Stop */}
       <div style={{marginTop:16,marginBottom:4}}>
         <button onClick={()=>setShowEmergency(true)} style={{width:"100%",padding:"14px",borderRadius:16,cursor:"pointer",fontWeight:800,fontSize:15,background:"rgba(255,0,60,0.12)",color:"#ff0044",border:"2px solid rgba(255,0,60,0.4)",display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
-          🚨 EMERGENCY STOP — Close All Positions
+          ? EMERGENCY STOP ? Close All Positions
         </button>
       </div>
 
       <div style={{textAlign:"center",fontSize:10,color:"rgba(255,255,255,0.2)",marginTop:8}}>
-        Shah Jee Trading Bot v2.0 · Claude AI · Weex Futures · 10x Leverage
+        Shah Jee Trading Bot v2.0 ? Claude AI ? Weex Futures ? 10x Leverage
       </div>
 
       <EmergencyModal show={showEmergency} done={emergencyDone} loading={emergencyLoading} positions={positions} prices={prices} onConfirm={executeEmergencyStop} onClose={()=>{setShowEmergency(false);setEmergencyDone(false);}}/>
