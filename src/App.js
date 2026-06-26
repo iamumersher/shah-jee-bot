@@ -501,8 +501,11 @@ RULES:
 - Account for leverage: 10x means small moves matter
 - With small balance ($${avail.toFixed(2)}), only take high-probability setups
 
-Respond with ONLY this exact JSON (no other text):
-{"signal":"BUY","confidence":75,"strategy":"EMA Cross + VWAP","reason":"Brief professional reason under 20 words.","entry":${price.toFixed(dp)},"sl":${(price*(R<50?1.008:0.992)).toFixed(dp)},"tp1":${(price*(R<50?0.992:1.008)).toFixed(dp)},"tp2":${(price*(R<50?0.985:1.015)).toFixed(dp)},"tp3":${(price*(R<50?0.978:1.022)).toFixed(dp)},"rr":"2.0","bias":"bullish"}`;
+Respond with ONLY valid JSON, no explanation, no markdown. Use these EXACT field names:
+{"signal":"BUY","confidence":75,"strategy":"EMA Cross + VWAP","reason":"One sentence max 20 words.","entry":${price.toFixed(dp)},"sl":${(price-A*1.5).toFixed(dp)},"tp1":${(price+A*2).toFixed(dp)},"tp2":${(price+A*3.5).toFixed(dp)},"tp3":${(price+A*5).toFixed(dp)},"rr":"2.0","bias":"bullish"}
+
+For SELL signals flip sl/tp: sl above entry, tp below entry.
+For HOLD: {"signal":"HOLD","confidence":45,"strategy":"No Setup","reason":"Brief reason.","entry":${price.toFixed(dp)},"sl":0,"tp1":0,"tp2":0,"tp3":0,"rr":"0","bias":"neutral"}`;
 
     try {
       let sig;
@@ -566,8 +569,13 @@ Respond with ONLY this exact JSON (no other text):
                 })
               });
               const od=await resp.json();
-              if(od.success) addLog(`📤 Weex order placed: ${sig.signal} ${od.contracts} contracts ${pair} | orderId:${od.orderId}`,"buy");
-              else addLog(`⚠️ Weex order failed: ${od.error}`,"warn");
+              if(od.success){
+                addLog(`📤 Real order placed: ${sig.signal} ${od.contracts} contracts ${pair} → orderId:${od.orderId}`,"buy");
+              } else if(od.needsMoreFunds){
+                addLog(`💰 ${pair} skipped — need $${od.marginNeeded} margin for 1 contract (have $${walletRef.current.USDT.toFixed(2)}). Add more USDT to futures wallet.`,"warn");
+              } else {
+                addLog(`⚠️ Order failed: ${od.error}`,"warn");
+              }
             } catch(e){ addLog(`⚠️ Weex order error: ${e.message}`,"warn"); }
           }
         } else {
@@ -586,12 +594,36 @@ Respond with ONLY this exact JSON (no other text):
   // ── Bot loop ─────────────────────────────────────────────────────────────────
   useEffect(()=>{
     if(running){
-      PAIRS.forEach(p=>analyze(p));
-      aiTimer.current=setInterval(()=>PAIRS.forEach(p=>analyze(p)),90000);
       const isLive=modeRef.current==="live";
-      if(isLive && weexRef.current.connected) addLog("🤖 Bot LIVE — real orders on Weex every 90s","sell");
-      else if(isLive && !weexRef.current.connected) addLog("⚠️ Live mode but Weex not connected — connect in Weex tab","warn");
-      else addLog("🤖 Bot PAPER — analyzing every 90s (no real orders)","info");
+      const avail=walletRef.current.USDT;
+
+      // In live mode: only analyze pairs we can actually afford to trade
+      // Contract margin: BTC=0.001*price/10, ETH=0.01*price/10, SOL=0.1*price/10
+      const affordablePairs = isLive
+        ? PAIRS.filter(p=>{
+            const cs={"BTC/USDT":0.001,"ETH/USDT":0.01,"SOL/USDT":0.1}[p]||0.01;
+            const margin=(cs*(prices[p]||SEED[p]))/10;
+            return margin <= avail;
+          })
+        : PAIRS; // paper mode: analyze all
+
+      if(affordablePairs.length===0){
+        addLog(`❌ Bot stopped — balance $${avail.toFixed(2)} too low for any contract. Add USDT to futures wallet.`,"warn");
+        setRunning(false);
+        return;
+      }
+
+      if(isLive && weexRef.current.connected){
+        const skipped=PAIRS.filter(p=>!affordablePairs.includes(p));
+        addLog(`🤖 Bot LIVE — trading: ${affordablePairs.join(", ")}${skipped.length?" | skipping: "+skipped.join(", ")+" (need more USDT)":""}","sell");
+      } else if(isLive && !weexRef.current.connected){
+        addLog("⚠️ Live mode but Weex not connected — go to Weex tab","warn");
+      } else {
+        addLog(`🤖 Bot PAPER — analyzing all pairs every 90s`,"info");
+      }
+
+      affordablePairs.forEach(p=>analyze(p));
+      aiTimer.current=setInterval(()=>affordablePairs.forEach(p=>analyze(p)),90000);
     } else {
       clearInterval(aiTimer.current);
     }
