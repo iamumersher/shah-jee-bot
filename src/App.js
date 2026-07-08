@@ -445,8 +445,10 @@ export default function App(){
       setWeexBalance(d);
       const futUSDT=parseFloat(d.futures?.USDT?.available||0);
       const spotUSDT=parseFloat(d.spot?.USDT?.available||0);
-      const total=spotUSDT>0?spotUSDT:futUSDT;
-      if(total>0){setWallet(w=>({...w,USDT:total}));addLog(`💰 Balance refreshed: $${total.toFixed(2)} USDT`,"info");}
+      // Always use futures USDT — trading capital is in futures wallet
+      const tradingUSDT=futUSDT;
+      if(tradingUSDT>0){setWallet(w=>({...w,USDT:tradingUSDT}));addLog(`💰 Balance refreshed: $${tradingUSDT.toFixed(2)} futures USDT available`,"info");}
+      else if(spotUSDT>0){addLog(`⚠️ Futures empty, spot has $${spotUSDT.toFixed(2)} — transfer to futures to trade`,"warn");}
     }catch(e){addLog(`⚠️ Balance refresh failed: ${e.message}`,"warn");}
   },[addLog]);
 
@@ -627,18 +629,21 @@ For HOLD: {"signal":"HOLD","confidence":40,"strategy":"No Setup","reason":"Marke
       setWeexConnected(true);
       const futUSDT=parseFloat(d.futures?.USDT?.available||0);
       const spotUSDT=parseFloat(d.spot?.USDT?.available||0);
-      const total=spotUSDT>0?spotUSDT:futUSDT;
-      if(total>0){
-        setWallet(w=>({...w,USDT:total}));
-        setStartBal(total);
-        setPnlHist([total]);
-        addLog(`✅ Weex connected! Futures: $${futUSDT.toFixed(2)} | Spot: $${spotUSDT.toFixed(2)}`,"buy");
-        if(futUSDT>0){
-          const tradeable=PAIRS.filter(p=>{const cs=CS[p]||0.01;return(cs*pricesRef.current[p])/10<=futUSDT;});
-          addLog(`💰 With $${futUSDT.toFixed(2)}, can trade: ${tradeable.join(", ")||"none — add more USDT"}`,"info");
-        }
+      // ALWAYS use futures USDT for trading — that is where trading capital lives
+      // Spot USDT is separate and not used for futures contracts
+      const tradingUSDT = futUSDT; // futures wallet = trading capital
+      if(tradingUSDT>0){
+        setWallet(w=>({...w,USDT:tradingUSDT}));
+        setStartBal(tradingUSDT);
+        setPnlHist([tradingUSDT]);
+        addLog(`✅ Weex connected! Trading wallet: $${tradingUSDT.toFixed(2)} USDT (Futures) | Spot: $${spotUSDT.toFixed(2)}`,"buy");
+        const tradeable=PAIRS.filter(p=>{const cs=CS[p]||0.01;return(cs*(pricesRef.current[p]||SEED[p]))/10<=tradingUSDT;});
+        addLog(`💰 With $${tradingUSDT.toFixed(2)} futures USDT, can trade: ${tradeable.join(", ")||"none"}`,"info");
+      } else if(spotUSDT>0){
+        addLog(`⚠️ Futures wallet empty ($0). You have $${spotUSDT.toFixed(2)} in spot — transfer it to your Weex futures wallet to trade.`,"warn");
+        setWallet(w=>({...w,USDT:0}));
       } else {
-        addLog("✅ Weex connected — balance is zero. Add USDT to your futures wallet.","warn");
+        addLog("✅ Weex connected — both wallets empty. Transfer USDT to your futures wallet.","warn");
       }
     }catch(e){
       addLog(`❌ Connection failed: ${e.message}`,"warn");
