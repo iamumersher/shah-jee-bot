@@ -319,11 +319,15 @@ export default function App(){
   const [tab,setTab]               = useState("markets");
   const [selPair,setSelPair]       = useState("BTC/USDT");
   const [running,setRunning]       = useState(false);
+  // ACCOUNT TYPE: "paper" = $1000 virtual money, no real orders
+  //               "live"  = real Weex account
+  const [accountType,setAccountType] = useState("paper");
   // TRADING MODE: "manual" = AI signals → approval modal before trade
   //               "auto"   = AI trades automatically with risk management
   const [tradeMode,setTradeMode]   = useState("manual");
   // LOCK: set to true after emergency stop — must manually press Start Bot
   const [locked,setLocked]         = useState(false);
+  const [paperWalletSize,setPaperWalletSize] = useState(1000);
 
   // Weex
   const [weexKey,setWeexKey]             = useState("");
@@ -359,6 +363,7 @@ export default function App(){
   // Refs — prevent stale closures
   const aiTimer    = useRef(null);
   const modeRef    = useRef("manual");
+  const accountRef = useRef("paper"); // "paper" or "live"
   const lockedRef  = useRef(false);
   const weexRef    = useRef({connected:false,key:"",secret:"",passphrase:""});
   const walletRef  = useRef({USDT:0});
@@ -366,6 +371,17 @@ export default function App(){
   const posRef     = useRef({});
 
   useEffect(()=>{ modeRef.current=tradeMode; },[tradeMode]);
+  useEffect(()=>{ accountRef.current=accountType; },[accountType]);
+  // When switching to paper mode, reset to $1000 virtual wallet
+  useEffect(()=>{
+    if(accountType==="paper"){
+      setWallet({USDT:paperWalletSize,BTC:0,ETH:0,SOL:0});
+      setStartBal(paperWalletSize);
+      setPnlHist([paperWalletSize]);
+      setPositions({});setSignals({});setTrades([]);
+      addLog(`📄 Paper trading mode — virtual wallet: $${paperWalletSize.toLocaleString()}. No real orders.`,"info");
+    }
+  },[accountType,paperWalletSize]);
   useEffect(()=>{ lockedRef.current=locked; },[locked]);
   useEffect(()=>{ weexRef.current={connected:weexConnected,key:weexKey,secret:weexSecret,passphrase:weexPassphrase}; },[weexConnected,weexKey,weexSecret,weexPassphrase]);
   useEffect(()=>{ walletRef.current=wallet; },[wallet]);
@@ -471,10 +487,12 @@ export default function App(){
     }}));
     setWallet(w=>({...w,USDT:Math.max(0,w.USDT-parseFloat(margin))}));
     setTrades(t=>[{id:Date.now(),pair,action:`${sig.signal} ${contracts} contracts`,price:fp(pair,price),ts:ts(),conf:sig.confidence,strat:sig.strategy,leverage},...t].slice(0,200));
-    addLog(`✅ ${sig.signal} ${contracts} contracts ${pair} @ $${fp(pair,price)} | ${leverage}x | Margin $${margin} | SL $${fp(pair,sig.sl)} | TP2 $${fp(pair,sig.tp2)}`,sig.signal==="BUY"?"buy":"sell");
+    const acctLabel=accountRef.current==="paper"?"[PAPER] ":"[LIVE] ";
+    addLog(`✅ ${acctLabel}${sig.signal} ${contracts} contracts ${pair} @ $${fp(pair,price)} | ${leverage}x | Margin $${margin} | SL $${fp(pair,sig.sl)} | TP2 $${fp(pair,sig.tp2)}`,sig.signal==="BUY"?"buy":"sell");
 
-    // Real Weex order
-    if(isLive){
+    // Real Weex order — only in live mode with Weex connected
+    const isPaper = accountRef.current==="paper";
+    if(isLive && !isPaper){
       try{
         const resp=await fetch(`${PROXY}/weex/order`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:weexRef.current.key,secret:weexRef.current.secret,passphrase:weexRef.current.passphrase,pair,side:sig.signal,leverage,usdtAmount,price})});
         const od=await resp.json();
@@ -592,20 +610,23 @@ For HOLD: {"signal":"HOLD","confidence":40,"strategy":"No Setup","reason":"Marke
       const isLive=weexRef.current.connected;
 
       // Only analyze pairs we can afford in live mode
-      const affordable=isLive
+      const isPaper = accountRef.current==="paper";
+      const affordable=(!isPaper&&isLive)
         ?PAIRS.filter(p=>{const cs=CS[p]||0.01;const m=(cs*(pricesRef.current[p]||SEED[p]))/10;return m<=avail;})
-        :PAIRS;
+        :PAIRS; // paper mode: trade all pairs freely
 
-      if(isLive&&affordable.length===0){
+      if(!isPaper&&isLive&&affordable.length===0){
         addLog(`❌ Balance $${avail.toFixed(2)} too low for any contract. Add USDT to futures wallet.`,"warn");
         setRunning(false);return;
       }
 
       const mode=modeRef.current;
       const skipped=PAIRS.filter(p=>!affordable.includes(p));
-      addLog(`🤖 Bot started [${mode.toUpperCase()} mode] | Trading: ${affordable.join(", ")}${skipped.length?" | Skipping: "+skipped.join(", "):""}`,mode==="auto"?"sell":"info");
-      if(mode==="manual")addLog("👆 Manual mode: AI will generate signals and ask your approval before every trade","info");
-      else addLog("⚡ Auto mode: AI will trade automatically with 10% wallet risk per trade","info");
+      const acct=isPaper?"📄 PAPER":"⚡ LIVE";
+      addLog(`🤖 Bot started [${acct}] [${mode.toUpperCase()}] | Trading: ${affordable.join(", ")}${(!isPaper&&skipped.length)?" | Skipping: "+skipped.join(", "):""}`,mode==="auto"?"sell":"info");
+      if(isPaper)addLog(`📄 Paper wallet: $${avail.toFixed(2)} virtual USDT — zero real risk`,"info");
+      if(mode==="manual")addLog("👆 Manual mode: AI signals → you approve each trade","info");
+      else addLog("⚡ Auto mode: AI analyzes and trades automatically","info");
 
       affordable.forEach(p=>analyze(p));
       aiTimer.current=setInterval(()=>affordable.forEach(p=>analyze(p)),90000);
@@ -717,14 +738,49 @@ For HOLD: {"signal":"HOLD","confidence":40,"strategy":"No Setup","reason":"Marke
         </div>
       </div>
 
-      {/* TRADE MODE BAR */}
-      <div style={{display:"flex",gap:8,marginBottom:12,background:"rgba(255,255,255,0.04)",borderRadius:14,padding:5}}>
-        <button onClick={()=>setTradeMode("manual")} style={{flex:1,padding:"9px",borderRadius:10,cursor:"pointer",fontSize:12,fontWeight:700,background:tradeMode==="manual"?"linear-gradient(135deg,rgba(108,92,231,0.6),rgba(167,139,250,0.4))":"transparent",color:tradeMode==="manual"?"#fff":"rgba(255,255,255,0.4)",border:"none"}}>
-          👆 Manual — I approve trades
-        </button>
-        <button onClick={()=>setTradeMode("auto")} style={{flex:1,padding:"9px",borderRadius:10,cursor:"pointer",fontSize:12,fontWeight:700,background:tradeMode==="auto"?"linear-gradient(135deg,rgba(0,200,100,0.4),rgba(0,255,136,0.3))":"transparent",color:tradeMode==="auto"?"#00ff88":"rgba(255,255,255,0.4)",border:"none"}}>
-          ⚡ Auto — AI trades for me
-        </button>
+      {/* ACCOUNT + MODE SELECTOR */}
+      <div style={{marginBottom:12}}>
+        {/* Account type row */}
+        <div style={{display:"flex",gap:6,marginBottom:6,background:"rgba(255,255,255,0.04)",borderRadius:14,padding:4}}>
+          <button onClick={()=>setAccountType("paper")} style={{flex:1,padding:"9px 6px",borderRadius:10,cursor:"pointer",fontSize:12,fontWeight:700,background:accountType==="paper"?"linear-gradient(135deg,rgba(255,215,0,0.3),rgba(255,165,0,0.2))":"transparent",color:accountType==="paper"?"#ffd700":"rgba(255,255,255,0.4)",border:`1px solid ${accountType==="paper"?"rgba(255,215,0,0.4)":"transparent"}`,transition:"all 0.2s"}}>
+            📄 Paper Trading
+          </button>
+          <button onClick={()=>setAccountType("live")} style={{flex:1,padding:"9px 6px",borderRadius:10,cursor:"pointer",fontSize:12,fontWeight:700,background:accountType==="live"?"linear-gradient(135deg,rgba(0,255,136,0.3),rgba(56,189,248,0.2))":"transparent",color:accountType==="live"?"#00ff88":"rgba(255,255,255,0.4)",border:`1px solid ${accountType==="live"?"rgba(0,255,136,0.4)":"transparent"}`,transition:"all 0.2s"}}>
+            ⚡ Live Trading
+          </button>
+        </div>
+        {/* Execution mode row */}
+        <div style={{display:"flex",gap:6,background:"rgba(255,255,255,0.04)",borderRadius:14,padding:4}}>
+          <button onClick={()=>setTradeMode("manual")} style={{flex:1,padding:"8px 6px",borderRadius:10,cursor:"pointer",fontSize:11,fontWeight:700,background:tradeMode==="manual"?"linear-gradient(135deg,rgba(108,92,231,0.5),rgba(167,139,250,0.3))":"transparent",color:tradeMode==="manual"?"#a78bfa":"rgba(255,255,255,0.35)",border:`1px solid ${tradeMode==="manual"?"rgba(167,139,250,0.3)":"transparent"}`,transition:"all 0.2s"}}>
+            👆 Manual Approval
+          </button>
+          <button onClick={()=>setTradeMode("auto")} style={{flex:1,padding:"8px 6px",borderRadius:10,cursor:"pointer",fontSize:11,fontWeight:700,background:tradeMode==="auto"?"linear-gradient(135deg,rgba(0,200,100,0.35),rgba(0,255,136,0.2))":"transparent",color:tradeMode==="auto"?"#00ff88":"rgba(255,255,255,0.35)",border:`1px solid ${tradeMode==="auto"?"rgba(0,255,136,0.3)":"transparent"}`,transition:"all 0.2s"}}>
+            🤖 AI Auto Trade
+          </button>
+        </div>
+        {/* Paper wallet size picker */}
+        {accountType==="paper"&&(
+          <div style={{marginTop:8,padding:"10px 14px",background:"rgba(255,215,0,0.07)",borderRadius:12,border:"1px solid rgba(255,215,0,0.2)"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+              <span style={{fontSize:12,color:"#ffd700",fontWeight:600}}>📄 Paper Wallet Size</span>
+              <span style={{fontSize:14,fontWeight:800,color:"#ffd700"}}>${paperWalletSize.toLocaleString()}</span>
+            </div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {[100,500,1000,5000,10000].map(amt=>(
+                <button key={amt} onClick={()=>{setPaperWalletSize(amt);setWallet({USDT:amt,BTC:0,ETH:0,SOL:0});setStartBal(amt);setPnlHist([amt]);setPositions({});setSignals({});setTrades([]);addLog(`📄 Paper wallet reset to $${amt.toLocaleString()}`,"info");}} style={{padding:"5px 12px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700,background:paperWalletSize===amt?"rgba(255,215,0,0.25)":"rgba(255,255,255,0.07)",color:paperWalletSize===amt?"#ffd700":"rgba(255,255,255,0.5)",border:`1px solid ${paperWalletSize===amt?"rgba(255,215,0,0.4)":"rgba(255,255,255,0.1)"}` }}>
+                  ${amt.toLocaleString()}
+                </button>
+              ))}
+            </div>
+            <div style={{marginTop:6,fontSize:11,color:"rgba(255,255,255,0.35)"}}>Virtual money — test AI accuracy with zero real risk</div>
+          </div>
+        )}
+        {/* Live warning if Weex not connected */}
+        {accountType==="live"&&!weexConnected&&(
+          <div style={{marginTop:8,padding:"9px 14px",background:"rgba(255,68,102,0.1)",borderRadius:12,border:"1px solid rgba(255,68,102,0.3)",fontSize:12,color:"#ff4466"}}>
+            ⚠️ Connect your Weex account in the 🔗 Weex tab to enable live trading
+          </div>
+        )}
       </div>
 
       {/* TABS */}
@@ -743,7 +799,11 @@ For HOLD: {"signal":"HOLD","confidence":40,"strategy":"No Setup","reason":"Marke
           <div style={{...glass({background:"linear-gradient(135deg,rgba(108,92,231,0.3),rgba(56,189,248,0.2))",marginBottom:12})}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
               <div>
-                <div style={{fontSize:11,color:"rgba(255,255,255,0.5)",marginBottom:4}}>Portfolio</div>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                  <span style={{fontSize:11,color:"rgba(255,255,255,0.5)"}}>Portfolio</span>
+                  {accountType==="paper"&&<span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:8,background:"rgba(255,215,0,0.15)",color:"#ffd700",border:"1px solid rgba(255,215,0,0.3)"}}>📄 PAPER</span>}
+                  {accountType==="live"&&<span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:8,background:"rgba(0,255,136,0.15)",color:"#00ff88",border:"1px solid rgba(0,255,136,0.3)"}}>⚡ LIVE</span>}
+                </div>
                 <div style={{fontSize:32,fontWeight:800,letterSpacing:-1}}>{tv>0?`$${tv.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}`:"—"}</div>
                 {startBal>0&&<div style={{fontSize:13,color:pnl>=0?"#00ff88":"#ff4466",fontWeight:600,marginTop:4}}>{pnl>=0?"▲":"▼"} ${Math.abs(pnl).toFixed(2)} ({pnl>=0?"+":""}{pnlPct}%)</div>}
                 {!weexConnected&&<div style={{fontSize:12,color:"rgba(255,255,255,0.35)",marginTop:4}}>Connect Weex to see live balance</div>}
@@ -764,9 +824,12 @@ For HOLD: {"signal":"HOLD","confidence":40,"strategy":"No Setup","reason":"Marke
             ))}
           </div>
 
-          {/* Mode reminder */}
-          <div style={{padding:"10px 14px",borderRadius:12,background:tradeMode==="auto"?"rgba(0,255,136,0.08)":"rgba(167,139,250,0.1)",border:`1px solid ${tradeMode==="auto"?"rgba(0,255,136,0.2)":"rgba(167,139,250,0.2)"}`,marginBottom:12,fontSize:12,color:tradeMode==="auto"?"#00ff88":"#a78bfa"}}>
-            {tradeMode==="auto"?"⚡ AUTO MODE: AI analyzes every 90s and places trades automatically with 10% risk per trade.":"👆 MANUAL MODE: AI generates signals and asks your approval before every trade. You choose leverage and amount."}
+          {/* Status banner */}
+          <div style={{padding:"10px 14px",borderRadius:12,background:accountType==="paper"?"rgba(255,215,0,0.07)":tradeMode==="auto"?"rgba(0,255,136,0.08)":"rgba(167,139,250,0.1)",border:`1px solid ${accountType==="paper"?"rgba(255,215,0,0.2)":tradeMode==="auto"?"rgba(0,255,136,0.2)":"rgba(167,139,250,0.2)"}`,marginBottom:12,fontSize:12,color:accountType==="paper"?"#ffd700":tradeMode==="auto"?"#00ff88":"#a78bfa"}}>
+            {accountType==="paper"
+              ? `📄 PAPER MODE ($${wallet.USDT.toFixed(2)} virtual): ${tradeMode==="auto"?"AI trades automatically — testing accuracy with zero real risk":"AI generates signals — you approve each trade to test your judgement"}`
+              : tradeMode==="auto"?"⚡ LIVE AUTO: AI analyzes every 90s and places real Weex orders with 10% risk per trade":"👆 LIVE MANUAL: AI generates real signals — you approve each trade before it's sent to Weex"
+            }
           </div>
 
           {/* Pair cards */}
@@ -1038,8 +1101,29 @@ For HOLD: {"signal":"HOLD","confidence":40,"strategy":"No Setup","reason":"Marke
       {tab==="settings"&&(
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
           <div style={glass()}>
-            <div style={{fontWeight:700,marginBottom:12}}>Trading Mode</div>
-            {[["manual","👆 Manual","AI signals require your approval. You choose leverage and amount.","#a78bfa"],["auto","⚡ Auto","AI analyzes and trades automatically using 10% wallet risk per trade.","#00ff88"]].map(([m,t,s,c])=>(
+            <div style={{fontWeight:700,marginBottom:12}}>Account Type</div>
+            {[["paper","📄 Paper Trading","Virtual $1,000 wallet. Test AI accuracy with zero real risk. No Weex needed.","#ffd700"],["live","⚡ Live Trading","Real Weex account. Actual money. Only trade what you can afford to lose.","#00ff88"]].map(([m,t,s,c])=>(
+              <button key={m} onClick={()=>setAccountType(m)} style={{display:"block",width:"100%",padding:"12px 14px",borderRadius:12,cursor:"pointer",background:accountType===m?`${c}18`:"rgba(255,255,255,0.04)",border:`1.5px solid ${accountType===m?c+"60":"rgba(255,255,255,0.1)"}`,textAlign:"left",marginBottom:8}}>
+                <div style={{fontWeight:700,color:accountType===m?c:"#fff",fontSize:14}}>{t}</div>
+                <div style={{fontSize:12,color:"rgba(255,255,255,0.4)",marginTop:3}}>{s}</div>
+              </button>
+            ))}
+            {accountType==="paper"&&(
+              <div style={{marginTop:4,padding:"10px 12px",background:"rgba(255,215,0,0.08)",borderRadius:10,border:"1px solid rgba(255,215,0,0.2)"}}>
+                <div style={{fontSize:12,color:"#ffd700",fontWeight:600,marginBottom:8}}>Paper Wallet Size</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {[100,500,1000,5000,10000].map(amt=>(
+                    <button key={amt} onClick={()=>{setPaperWalletSize(amt);setWallet({USDT:amt,BTC:0,ETH:0,SOL:0});setStartBal(amt);setPnlHist([amt]);setPositions({});setSignals({});setTrades([]);}} style={{padding:"5px 12px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700,background:paperWalletSize===amt?"rgba(255,215,0,0.25)":"rgba(255,255,255,0.07)",color:paperWalletSize===amt?"#ffd700":"rgba(255,255,255,0.5)",border:`1px solid ${paperWalletSize===amt?"rgba(255,215,0,0.4)":"rgba(255,255,255,0.1)"}`}}>
+                      ${amt.toLocaleString()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <div style={glass()}>
+            <div style={{fontWeight:700,marginBottom:12}}>Execution Mode</div>
+            {[["manual","👆 Manual Approval","AI generates signal → approval card → you set leverage & amount → confirm","#a78bfa"],["auto","🤖 AI Auto Trade","AI analyzes every 90s and executes automatically with 10% wallet risk","#00ff88"]].map(([m,t,s,c])=>(
               <button key={m} onClick={()=>setTradeMode(m)} style={{display:"block",width:"100%",padding:"12px 14px",borderRadius:12,cursor:"pointer",background:tradeMode===m?`${c}18`:"rgba(255,255,255,0.04)",border:`1.5px solid ${tradeMode===m?c+"60":"rgba(255,255,255,0.1)"}`,textAlign:"left",marginBottom:8}}>
                 <div style={{fontWeight:700,color:tradeMode===m?c:"#fff",fontSize:14}}>{t}</div>
                 <div style={{fontSize:12,color:"rgba(255,255,255,0.4)",marginTop:3}}>{s}</div>
