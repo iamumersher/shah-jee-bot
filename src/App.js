@@ -13,7 +13,7 @@ const GRAD   = {"BTC/USDT":["#f7931a","#ff6b00"],"ETH/USDT":["#627eea","#a78bfa"
 const CS     = {"BTC/USDT":0.001,"ETH/USDT":0.01,"SOL/USDT":0.1};
 
 // ─────────────────────────────────────────────────────────────────────────────
-// INDICATORS
+// ADVANCED INDICATORS — Institutional Grade
 // ─────────────────────────────────────────────────────────────────────────────
 function iEMA(closes,p){
   if(!closes||closes.length<2)return closes?.[0]||0;
@@ -35,21 +35,130 @@ function iATR(candles,p=14){
 }
 function iBB(closes,p=20){
   const last=closes?.[closes.length-1]||0;
-  if(!closes||closes.length<p)return{u:last*1.02,m:last,lo:last*0.98};
+  if(!closes||closes.length<p)return{u:last*1.02,m:last,lo:last*0.98,bw:0.04};
   const s=closes.slice(-p),m=s.reduce((a,b)=>a+b,0)/p;
   const sd=Math.sqrt(s.reduce((a,b)=>a+(b-m)**2,0)/p);
-  return{u:m+2*sd,m,lo:m-2*sd};
+  return{u:m+2*sd,m,lo:m-2*sd,bw:(4*sd)/m}; // bandwidth = squeeze indicator
 }
-function iMACD(closes){return iEMA(closes,12)-iEMA(closes,26);}
+function iMACD(closes){
+  const fast=iEMA(closes,12),slow=iEMA(closes,26),sig=iEMA(closes.map((_,i)=>i>=26?iEMA(closes.slice(0,i+1),12)-iEMA(closes.slice(0,i+1),26):0).filter(v=>v!==0),9);
+  const macd=fast-slow;
+  return{macd,signal:sig,hist:macd-sig};
+}
 function iStoch(candles,p=14){
-  const s=candles?.slice(-p);if(!s?.length)return 50;
+  const s=candles?.slice(-p);if(!s?.length)return{k:50,d:50};
   const hi=Math.max(...s.map(c=>c.h)),lo=Math.min(...s.map(c=>c.l));
-  return((candles[candles.length-1].c-lo)/(hi-lo||1))*100;
+  const k=((candles[candles.length-1].c-lo)/(hi-lo||1))*100;
+  return{k,d:k}; // simplified D
 }
 function iVWAP(candles){
   if(!candles||candles.length<2)return 0;
   const s=candles.slice(-48),tv=s.reduce((a,c)=>a+c.v,0);
   return s.reduce((a,c)=>a+(((c.h+c.l+c.c)/3)*c.v),0)/(tv||1);
+}
+// Average True Range — smooth version
+function iATRSmooth(candles,p=14){
+  if(!candles||candles.length<p+1)return iATR(candles,p);
+  const trs=candles.slice(1).map((c,i)=>Math.max(c.h-c.l,Math.abs(c.h-candles[i].c),Math.abs(c.l-candles[i].c)));
+  let atr=trs.slice(0,p).reduce((a,b)=>a+b,0)/p;
+  for(let i=p;i<trs.length;i++)atr=(atr*(p-1)+trs[i])/p;
+  return atr;
+}
+// Pivot Points (Daily S/R levels)
+function iPivots(candles){
+  const day=candles.slice(-96); // ~24h of 15m candles
+  if(!day.length)return{pp:0,r1:0,r2:0,s1:0,s2:0};
+  const H=Math.max(...day.map(c=>c.h)),L=Math.min(...day.map(c=>c.l)),C=day[day.length-1].c;
+  const pp=(H+L+C)/3;
+  return{pp,r1:2*pp-L,r2:pp+(H-L),s1:2*pp-H,s2:pp-(H-L),r3:H+2*(pp-L),s3:L-2*(H-pp)};
+}
+// Volume analysis — is current volume above average?
+function iVolume(candles){
+  if(!candles||candles.length<20)return{ratio:1,trend:"normal"};
+  const recent=candles.slice(-3).map(c=>c.v);
+  const avg=candles.slice(-20).map(c=>c.v).reduce((a,b)=>a+b,0)/20;
+  const ratio=(recent.reduce((a,b)=>a+b,0)/3)/(avg||1);
+  return{ratio,trend:ratio>1.5?"high":ratio<0.7?"low":"normal",avg};
+}
+// Higher timeframe trend (using last 4h of 15m candles = 16 candles)
+function iHTF(candles){
+  if(!candles||candles.length<16)return{trend:"unknown",strength:0};
+  const h4=candles.slice(-16);
+  const opens=h4[0].o, closes=h4[h4.length-1].c;
+  const ema50=iEMA(candles.map(c=>c.c),50);
+  const price=closes;
+  const trend=closes>opens?"bullish":"bearish";
+  const strength=Math.abs((closes-opens)/opens*100);
+  return{trend,strength,aboveEMA50:price>ema50};
+}
+// Candlestick pattern detection
+function iPatterns(candles){
+  if(!candles||candles.length<3)return[];
+  const c=candles,n=c.length,patterns=[];
+  const last=c[n-1],prev=c[n-2],prev2=c[n-3];
+  const body=v=>Math.abs(v.c-v.o);
+  const range=v=>v.h-v.l;
+  const isBull=v=>v.c>v.o, isBear=v=>v.c<v.o;
+  // Hammer (bullish reversal at bottom)
+  if(isBull(last)&&(last.h-last.c)<body(last)*0.3&&(last.o-last.l)>body(last)*2)patterns.push("🔨 Hammer (Bullish)");
+  // Shooting star (bearish reversal at top)
+  if(isBear(last)&&(last.c-last.l)<body(last)*0.3&&(last.h-last.o)>body(last)*2)patterns.push("⭐ Shooting Star (Bearish)");
+  // Bullish engulfing
+  if(isBear(prev)&&isBull(last)&&last.c>prev.o&&last.o<prev.c)patterns.push("🟢 Bullish Engulfing");
+  // Bearish engulfing
+  if(isBull(prev)&&isBear(last)&&last.c<prev.o&&last.o>prev.c)patterns.push("🔴 Bearish Engulfing");
+  // Doji (indecision)
+  if(body(last)<range(last)*0.1)patterns.push("⚖️ Doji (Indecision)");
+  // Three white soldiers
+  if(isBull(last)&&isBull(prev)&&isBull(prev2)&&last.c>prev.c&&prev.c>prev2.c)patterns.push("📈 Three White Soldiers");
+  // Three black crows
+  if(isBear(last)&&isBear(prev)&&isBear(prev2)&&last.c<prev.c&&prev.c<prev2.c)patterns.push("📉 Three Black Crows");
+  return patterns;
+}
+// RSI Divergence detection
+function iDivergence(candles,rsiPeriod=14){
+  const cls=candles.map(c=>c.c);
+  if(cls.length<30)return{bull:false,bear:false};
+  // Check last 20 candles for divergence
+  const recent=cls.slice(-20),recentC=candles.slice(-20);
+  const rsiVals=recent.map((_,i)=>iRSI(recent.slice(0,i+rsiPeriod+1),rsiPeriod));
+  // Price making lower lows but RSI making higher lows = bullish divergence
+  const pLL=recent[recent.length-1]<Math.min(...recent.slice(0,-1));
+  const rsiHL=rsiVals[rsiVals.length-1]>Math.min(...rsiVals.slice(0,-1).filter(v=>v>0));
+  const bull=pLL&&rsiHL;
+  // Price making higher highs but RSI making lower highs = bearish divergence
+  const pHH=recent[recent.length-1]>Math.max(...recent.slice(0,-1));
+  const rsiLH=rsiVals[rsiVals.length-1]<Math.max(...rsiVals.slice(0,-1).filter(v=>v>0));
+  const bear=pHH&&rsiLH;
+  return{bull,bear};
+}
+// Support & Resistance levels from recent price action
+function iSRLevels(candles){
+  if(!candles||candles.length<20)return{supports:[],resistances:[]};
+  const highs=candles.slice(-50).map(c=>c.h);
+  const lows=candles.slice(-50).map(c=>c.l);
+  const price=candles[candles.length-1].c;
+  // Find swing highs/lows
+  const swingH=[],swingL=[];
+  for(let i=2;i<highs.length-2;i++){
+    if(highs[i]>highs[i-1]&&highs[i]>highs[i+1]&&highs[i]>highs[i-2]&&highs[i]>highs[i+2])swingH.push(highs[i]);
+    if(lows[i]<lows[i-1]&&lows[i]<lows[i+1]&&lows[i]<lows[i-2]&&lows[i]<lows[i+2])swingL.push(lows[i]);
+  }
+  return{
+    resistances:swingH.filter(h=>h>price).sort((a,b)=>a-b).slice(0,3),
+    supports:swingL.filter(l=>l<price).sort((a,b)=>b-a).slice(0,3)
+  };
+}
+// Market structure: Higher Highs / Lower Lows
+function iStructure(candles){
+  if(!candles||candles.length<10)return"unknown";
+  const recent=candles.slice(-10);
+  const highs=recent.map(c=>c.h),lows=recent.map(c=>c.l);
+  const hhcount=highs.filter((h,i)=>i>0&&h>highs[i-1]).length;
+  const llcount=lows.filter((l,i)=>i>0&&l<lows[i-1]).length;
+  if(hhcount>6)return"uptrend";
+  if(llcount>6)return"downtrend";
+  return"ranging";
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -504,96 +613,247 @@ export default function App(){
     }
   },[addLog,refreshBalance]);
 
-  // ── AI ANALYZE ─────────────────────────────────────────────────────────────
+  // ── CLOSE ONE POSITION MANUALLY ───────────────────────────────────────────
+  const closePosition=useCallback(async(pair)=>{
+    const pos=posRef.current[pair];
+    const price=pricesRef.current[pair]||0;
+    if(!pos){addLog(`⚠️ No open position for ${pair}`,"warn");return;}
+    const pnl=(pos.side==="BUY"?price-pos.entry:pos.entry-price)*pos.qty;
+    addLog(`🔴 Manually closing ${pair} ${pos.side} @ $${fp(pair,price)} | PnL: ${pnl>=0?"+":""}$${pnl.toFixed(2)}`,"loss");
+    // Return margin + pnl to wallet
+    setWallet(w=>({...w,USDT:Math.max(0,w.USDT+pos.margin+pnl)}));
+    setPositions(p=>{const n={...p};delete n[pair];return n;});
+    setTrades(t=>[{id:Date.now(),pair,action:`CLOSED ${pos.side}`,price:fp(pair,price),ts:ts(),pnl:`${pnl>=0?"+":""}$${pnl.toFixed(2)}`,leverage:pos.leverage,strat:pos.strategy},...t].slice(0,200));
+    // Send close order to Weex in live mode
+    if(accountRef.current==="live"&&weexRef.current.connected){
+      try{
+        // Close by placing opposite market order
+        const closeSide=pos.side==="BUY"?"SELL":"BUY";
+        const closePosSide=pos.side==="BUY"?"LONG":"SHORT"; // Weex uses positionSide to identify which position to close
+        const bodyObj={symbol:pair.replace("/",""),side:closeSide,positionSide:closePosSide,type:"MARKET",quantity:pos.contracts.toString(),newClientOrderId:"sjclose-"+Date.now()};
+        const bodyStr=JSON.stringify(bodyObj);
+        const ts2=Date.now().toString();
+        const r=await fetch(`${PROXY}/weex/order`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:weexRef.current.key,secret:weexRef.current.secret,passphrase:weexRef.current.passphrase,pair,side:closeSide,leverage:pos.leverage,usdtAmount:pos.margin,price})});
+        const d=await r.json();
+        if(d.success)addLog(`✅ Weex close order sent for ${pair} | orderId:${d.orderId}`,"buy");
+        else addLog(`⚠️ Weex close failed: ${d.error}`,"warn");
+        setTimeout(()=>refreshBalance(),3000);
+      }catch(e){addLog(`⚠️ Close order error: ${e.message}`,"warn");}
+    }
+  },[addLog,refreshBalance]);
+
+  // ── AI ANALYZE — Advanced Multi-Confluence System ──────────────────────────
   const analyze=useCallback(async(pair)=>{
-    if(lockedRef.current)return; // Hard lock after emergency stop
+    if(lockedRef.current)return;
     let cd=candles[pair];
-    if(!cd||cd.length<30){cd=makeCandles(prices[pair]||SEED[pair]);setCandles(p=>({...p,[pair]:cd}));}
+    if(!cd||cd.length<50){cd=makeCandles(prices[pair]||SEED[pair],150);setCandles(p=>({...p,[pair]:cd}));}
     setAiLoading(l=>({...l,[pair]:true}));
 
-    const cls=cd.map(c=>c.c),price=pricesRef.current[pair]||cls[cls.length-1],dp=DP[pair];
-    const R=iRSI(cls),E9=iEMA(cls,9),E21=iEMA(cls,21),E50=iEMA(cls,50);
-    const A=iATR(cd),B=iBB(cls),M=iMACD(cls),SK=iStoch(cd),VWAP=iVWAP(cd);
-    const day=cd.slice(-96),dH=day.length?Math.max(...day.map(c=>c.h)):0,dL=day.length?Math.min(...day.map(c=>c.l)):0;
+    const cls=cd.map(c=>c.c);
+    const price=pricesRef.current[pair]||cls[cls.length-1],dp=DP[pair];
+
+    // ── All indicators ───────────────────────────────────────────────────────
+    const R14  = iRSI(cls,14);
+    const R7   = iRSI(cls,7);  // Short-term RSI for faster signals
+    const E9   = iEMA(cls,9);
+    const E21  = iEMA(cls,21);
+    const E50  = iEMA(cls,50);
+    const E200 = iEMA(cls,200); // Long-term trend filter
+    const A    = iATRSmooth(cd,14);
+    const B    = iBB(cls,20);
+    const MC   = iMACD(cls);    // {macd, signal, hist}
+    const SK   = iStoch(cd,14); // {k, d}
+    const VWAP = iVWAP(cd);
+    const VOL  = iVolume(cd);
+    const HTF  = iHTF(cd);      // Higher timeframe bias
+    const PIV  = iPivots(cd);   // Pivot S/R levels
+    const PAT  = iPatterns(cd); // Candlestick patterns
+    const DIV  = iDivergence(cd,14); // RSI divergence
+    const SR   = iSRLevels(cd);
+    const STR  = iStructure(cd);
+
+    const day=cd.slice(-96);
+    const dH=day.length?Math.max(...day.map(c=>c.h)):0;
+    const dL=day.length?Math.min(...day.map(c=>c.l)):0;
     const hasPos=!!posRef.current[pair];
     const avail=walletRef.current.USDT;
 
-    const prompt=`You are an expert crypto futures trader. Analyze ${pair} on the 15-minute chart and provide the HIGHEST PROBABILITY signal — either LONG (BUY), SHORT (SELL), or HOLD.
+    // ── Pre-score: count bullish vs bearish signals ──────────────────────────
+    let bullScore=0,bearScore=0,warnings=[];
 
-LIVE DATA:
-Price=$${price.toFixed(dp)} | DayHigh=$${dH.toFixed(dp)} | DayLow=$${dL.toFixed(dp)} | VWAP=$${VWAP.toFixed(dp)} | ATR=$${A.toFixed(dp)}
+    // Trend alignment (most important)
+    if(E9>E21&&E21>E50)bullScore+=2; else if(E9<E21&&E21<E50)bearScore+=2;
+    if(price>E200)bullScore+=1; else bearScore+=1;
+    if(HTF.trend==="bullish")bullScore+=1; else bearScore+=1;
+    if(price>VWAP)bullScore+=1; else bearScore+=1;
+    if(STR==="uptrend")bullScore+=1; else if(STR==="downtrend")bearScore+=1;
+    else warnings.push("Market is ranging — lower reliability");
 
-MOMENTUM: RSI=${R.toFixed(1)} | Stoch=${SK.toFixed(1)} | MACD=${M.toFixed(dp>0?3:1)}
+    // Momentum
+    if(R14<35)bullScore+=2; else if(R14>65)bearScore+=2;
+    if(R14<30)bullScore+=1; else if(R14>70)bearScore+=1; // stronger signal
+    if(MC.hist>0&&MC.macd>MC.signal)bullScore+=1; else if(MC.hist<0&&MC.macd<MC.signal)bearScore+=1;
+    if(SK.k<25)bullScore+=1; else if(SK.k>75)bearScore+=1;
 
-TREND:
-EMA9=$${E9.toFixed(dp)} | EMA21=$${E21.toFixed(dp)} | EMA50=$${E50.toFixed(dp)}
-EMA Alignment: ${E9>E21&&E21>E50?"BULLISH (all stacked up)":E9<E21&&E21<E50?"BEARISH (all stacked down)":"MIXED"}
-Price vs VWAP: ${price>VWAP?"ABOVE (bullish)":"BELOW (bearish)"}
+    // BB position
+    if(price<B.lo)bullScore+=2; else if(price>B.u)bearScore+=2;
+    if(B.bw<0.02)warnings.push("BB squeeze — big move incoming, direction unclear");
 
-VOLATILITY:
-BB_Upper=$${B.u.toFixed(dp)} | BB_Mid=$${B.m.toFixed(dp)} | BB_Lower=$${B.lo.toFixed(dp)}
-Price position: ${price>B.u?"ABOVE upper band":price<B.lo?"BELOW lower band":"Inside bands"}
+    // Volume confirmation
+    if(VOL.ratio<0.7)warnings.push("Low volume — signal less reliable");
+
+    // Divergence (very strong signal)
+    if(DIV.bull){bullScore+=3;warnings.push("RSI Bullish Divergence detected — strong reversal signal");}
+    if(DIV.bear){bearScore+=3;warnings.push("RSI Bearish Divergence detected — strong reversal signal");}
+
+    // Candlestick patterns
+    PAT.forEach(p=>{
+      if(p.includes("Bullish")||p.includes("Hammer")||p.includes("Soldiers"))bullScore+=1;
+      if(p.includes("Bearish")||p.includes("Star")||p.includes("Crows"))bearScore+=1;
+    });
+
+    // Pivot proximity
+    const nearR1=Math.abs(price-PIV.r1)/price<0.003;
+    const nearS1=Math.abs(price-PIV.s1)/price<0.003;
+    const nearPP=Math.abs(price-PIV.pp)/price<0.002;
+    if(nearR1)warnings.push("Near Pivot R1 — resistance overhead");
+    if(nearS1)warnings.push("Near Pivot S1 — support below");
+
+    // Conflict check — if signals are mixed, lower confidence
+    const totalScore=bullScore+bearScore;
+    const scoreDiff=Math.abs(bullScore-bearScore);
+    const isChoppy=scoreDiff<3||STR==="ranging";
+    if(isChoppy)warnings.push("Mixed signals — high chop risk");
+
+    // Nearest S/R levels for context
+    const nearResistance=SR.resistances[0]?`$${SR.resistances[0].toFixed(dp)}`:"none";
+    const nearSupport=SR.supports[0]?`$${SR.supports[0].toFixed(dp)}`:"none";
+
+    const prompt=`You are a senior institutional crypto futures trader. Your job is to protect capital first, then grow it. Analyze ${pair} 15-minute chart.
+
+MARKET STRUCTURE:
+Structure: ${STR.toUpperCase()} | HTF Bias: ${HTF.trend} (${HTF.strength.toFixed(2)}% move) | Above EMA200: ${price>E200}
+Day Range: $${dH.toFixed(dp)} - $${dL.toFixed(dp)} | Price: $${price.toFixed(dp)}
+Nearest Resistance: ${nearResistance} | Nearest Support: ${nearSupport}
+
+TREND INDICATORS:
+EMA9=$${E9.toFixed(dp)} | EMA21=$${E21.toFixed(dp)} | EMA50=$${E50.toFixed(dp)} | EMA200=$${E200.toFixed(dp)}
+EMA Stack: ${E9>E21&&E21>E50&&E50>E200?"FULL BULL 🟢":E9<E21&&E21<E50&&E50<E200?"FULL BEAR 🔴":"MIXED ⚠️"}
+VWAP=$${VWAP.toFixed(dp)} (price is ${price>VWAP?"ABOVE — bullish":"BELOW — bearish"})
+
+MOMENTUM INDICATORS:
+RSI(14)=${R14.toFixed(1)} | RSI(7)=${R7.toFixed(1)} | Stoch-K=${SK.k.toFixed(1)}
+MACD=${MC.macd.toFixed(dp>0?3:1)} | Signal=${MC.signal.toFixed(dp>0?3:1)} | Histogram=${MC.hist.toFixed(dp>0?3:1)} (${MC.hist>0?"bullish":"bearish"})
+RSI Divergence: ${DIV.bull?"BULLISH DIVERGENCE ⚡":DIV.bear?"BEARISH DIVERGENCE ⚡":"None"}
+
+VOLATILITY & VOLUME:
+ATR(14)=$${A.toFixed(dp)} | BB_Upper=$${B.u.toFixed(dp)} | BB_Mid=$${B.m.toFixed(dp)} | BB_Lower=$${B.lo.toFixed(dp)}
+BB Bandwidth: ${(B.bw*100).toFixed(2)}% (${B.bw<0.02?"SQUEEZE ⚠️":B.bw>0.08?"EXPANSION":"Normal"})
+Price vs BB: ${price>B.u?"ABOVE upper (overbought)":price<B.lo?"BELOW lower (oversold)":"Inside bands"}
+Volume ratio: ${VOL.ratio.toFixed(2)}x average (${VOL.trend})
+
+PIVOT LEVELS:
+R3=$${PIV.r3.toFixed(dp)} | R2=$${PIV.r2.toFixed(dp)} | R1=$${PIV.r1.toFixed(dp)} | PP=$${PIV.pp.toFixed(dp)} | S1=$${PIV.s1.toFixed(dp)} | S2=$${PIV.s2.toFixed(dp)} | S3=$${PIV.s3.toFixed(dp)}
+
+CANDLESTICK PATTERNS: ${PAT.length?PAT.join(", "):"No clear pattern"}
+
+PRE-ANALYSIS SCORE (higher = stronger signal):
+Bull signals: ${bullScore} | Bear signals: ${bearScore} | Conviction: ${scoreDiff}/${totalScore}
+Warnings: ${warnings.length?warnings.join(" | "):"None"}
 
 ACCOUNT: Available=$${avail.toFixed(2)} | HasPosition=${hasPos}
 
-EVALUATE ALL STRATEGIES:
-1. EMA Crossover: EMA9×EMA21 with EMA50 confirmation
-2. RSI: Oversold<30=BUY, Overbought>70=SELL
-3. BB Breakout: Break above upper=SHORT setup, below lower=LONG setup  
-4. VWAP Bounce: Price crossing VWAP direction
-5. MACD Cross: Positive=BUY, Negative=SELL momentum
-6. Day Hi/Lo: Near day high=SHORT, near day low=LONG
+TRADING RULES (STRICT — these protect from losses):
+1. NEVER signal if structure is ranging AND score difference < 3
+2. NEVER signal near major resistance (BUY) or major support (SELL) without volume confirmation
+3. ONLY signal when at least 5 indicators agree — no exceptions
+4. SL must be FIXED — place it at nearest swing low (BUY) or swing high (SELL), NOT at ATR distance
+5. For BUY: SL = below nearest support $${SR.supports[0]?SR.supports[0].toFixed(dp):(price-A*2).toFixed(dp)} | TP based on nearest resistance
+6. For SELL: SL = above nearest resistance $${SR.resistances[0]?SR.resistances[0].toFixed(dp):(price+A*2).toFixed(dp)} | TP based on next support
+7. Minimum R:R = 2:1 (if you can't get 2:1, output HOLD)
+8. If HTF trend contradicts signal direction, output HOLD
+9. Low volume + ranging market = HOLD always
+10. If already in position, HOLD always
 
-RULES:
-- If already in position: HOLD only
-- Minimum 3 confluent indicators required
-- R:R must be at least 1.5:1
-- If market is ranging/choppy: HOLD
-- Consider BOTH long AND short setups equally
-- SL: 1.5x ATR from entry | TP1: 2x ATR | TP2: 3.5x ATR | TP3: 5x ATR
+REQUIRED CONFLUENCE FOR SIGNAL:
+- BUY requires: price>VWAP + RSI<60 + MACD hist positive + EMA9>EMA21 + price above key support + volume normal/high
+- SELL requires: price<VWAP + RSI>40 + MACD hist negative + EMA9<EMA21 + price below key resistance + volume normal/high
 
-Respond ONLY with this exact JSON:
-{"signal":"BUY","confidence":72,"strategy":"EMA Cross + RSI Oversold","reason":"EMA9 crossed above EMA21 with RSI recovering from 28 oversold.","entry":${price.toFixed(dp)},"sl":${(price-A*1.5).toFixed(dp)},"tp1":${(price+A*2).toFixed(dp)},"tp2":${(price+A*3.5).toFixed(dp)},"tp3":${(price+A*5).toFixed(dp)},"rr":"2.3","bias":"bullish"}
+Based on ALL the above data, what is the SINGLE BEST trade setup right now?
 
-For SELL: sl above entry, tp below entry.
-For HOLD: {"signal":"HOLD","confidence":40,"strategy":"No Setup","reason":"Market ranging, no clear edge.","entry":${price.toFixed(dp)},"sl":0,"tp1":0,"tp2":0,"tp3":0,"rr":"0","bias":"neutral"}`;
+Respond ONLY with valid JSON:
+{"signal":"BUY","confidence":78,"strategy":"EMA Stack + RSI Oversold + VWAP Reclaim","reason":"Full bullish EMA stack with RSI recovering from 32, price reclaiming VWAP, MACD turning positive. Strong confluence with volume confirmation.","entry":${price.toFixed(dp)},"sl":${SR.supports[0]?(SR.supports[0]-A*0.3).toFixed(dp):(price-A*2).toFixed(dp)},"tp1":${(price+A*2).toFixed(dp)},"tp2":${SR.resistances[0]?SR.resistances[0].toFixed(dp):(price+A*3.5).toFixed(dp)},"tp3":${SR.resistances[1]?SR.resistances[1].toFixed(dp):(price+A*5).toFixed(dp)},"rr":"2.5","bias":"bullish","warnings":"${warnings.slice(0,2).join('; ')||'none'}","bullScore":${bullScore},"bearScore":${bearScore}}
+
+If HOLD: {"signal":"HOLD","confidence":${Math.max(30,50-scoreDiff*5)},"strategy":"Insufficient Confluence","reason":"Specific reason why not trading.","entry":${price.toFixed(dp)},"sl":0,"tp1":0,"tp2":0,"tp3":0,"rr":"0","bias":"${bullScore>bearScore?"slightly bullish":"slightly bearish"}","warnings":"${warnings.slice(0,2).join('; ')||'none'}","bullScore":${bullScore},"bearScore":${bearScore}}`;
 
     try{
       let sig;
       try{
-        const r=await fetch(`${PROXY}/ai/analyze`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt,pair}),signal:AbortSignal.timeout(35000)});
+        const r=await fetch(`${PROXY}/ai/analyze`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt,pair}),signal:AbortSignal.timeout(40000)});
         if(!r.ok)throw new Error("proxy error");
         sig=await r.json();
         if(sig.error)throw new Error(sig.error);
       }catch{
-        // Fallback: direct Anthropic (needs key in browser — mainly for dev)
-        sig={signal:"HOLD",confidence:0,strategy:"Proxy Error",reason:"Check Railway deployment and ANTHROPIC_API_KEY env var.",entry:price,sl:0,tp1:0,tp2:0,tp3:0,rr:"0",bias:"neutral"};
+        sig={signal:"HOLD",confidence:0,strategy:"Proxy Error",reason:"Check Railway deployment and ANTHROPIC_API_KEY.",entry:price,sl:0,tp1:0,tp2:0,tp3:0,rr:"0",bias:"neutral",warnings:"proxy offline",bullScore:0,bearScore:0};
       }
 
-      setSignals(s=>({...s,[pair]:{...sig,price,atr:A,ts:ts()}}));
-      addLog(`🤖 ${pair}: ${sig.signal} ${sig.confidence}% | ${sig.strategy}`,sig.signal==="BUY"?"buy":sig.signal==="SELL"?"sell":"info");
+      // ── Post-process: safety filters ──────────────────────────────────────
+      // 1. Force HOLD if score difference too small (choppy market)
+      if(sig.signal!=="HOLD" && scoreDiff<3){
+        sig={...sig,signal:"HOLD",confidence:30,strategy:"Low Conviction",reason:`Score diff only ${scoreDiff} — insufficient confluence. ${warnings[0]||"Market choppy."}`};
+      }
+      // 2. Force HOLD if HTF trend contradicts signal
+      if(sig.signal==="BUY"&&HTF.trend==="bearish"&&HTF.strength>1){
+        sig={...sig,signal:"HOLD",confidence:35,strategy:"HTF Conflict",reason:`4H trend is bearish (${HTF.strength.toFixed(1)}% move down). Wait for HTF alignment.`};
+      }
+      if(sig.signal==="SELL"&&HTF.trend==="bullish"&&HTF.strength>1){
+        sig={...sig,signal:"HOLD",confidence:35,strategy:"HTF Conflict",reason:`4H trend is bullish (${HTF.strength.toFixed(1)}% move up). Wait for HTF alignment.`};
+      }
+      // 3. Force HOLD if volume too low
+      if(sig.signal!=="HOLD"&&VOL.ratio<0.6){
+        sig={...sig,signal:"HOLD",confidence:30,strategy:"Low Volume",reason:"Volume is ${VOL.ratio.toFixed(1)}x below average — signal not confirmed by volume."};
+      }
+      // 4. Ensure SL is valid (not 0, not same as entry)
+      if(sig.signal!=="HOLD"){
+        if(!sig.sl||sig.sl===0||sig.sl===sig.entry){
+          sig.sl=sig.signal==="BUY"?(price-A*2).toFixed(dp):(price+A*2).toFixed(dp);
+        }
+        // Ensure SL is correct side
+        if(sig.signal==="BUY"&&parseFloat(sig.sl)>=price)sig.sl=(price-A*1.5).toFixed(dp);
+        if(sig.signal==="SELL"&&parseFloat(sig.sl)<=price)sig.sl=(price+A*1.5).toFixed(dp);
+        // Ensure TP is correct side
+        if(sig.signal==="BUY"&&parseFloat(sig.tp2)<=price)sig.tp2=(price+A*3).toFixed(dp);
+        if(sig.signal==="SELL"&&parseFloat(sig.tp2)>=price)sig.tp2=(price-A*3).toFixed(dp);
+        // Verify R:R >= 2:1
+        const rrCalc=Math.abs(parseFloat(sig.tp2)-price)/Math.abs(price-parseFloat(sig.sl));
+        if(rrCalc<1.8){
+          sig={...sig,signal:"HOLD",confidence:40,strategy:"Poor R:R",reason:`R:R only ${rrCalc.toFixed(1)}:1 — minimum 2:1 required for trade to be worthwhile.`};
+        }
+      }
 
-      const isLive  = weexRef.current.connected;
-      const isAuto  = modeRef.current==="auto";
-      const canTrade = !hasPos && running && !lockedRef.current && sig.signal!=="HOLD" && Number(sig.confidence)>=65;
+      setSignals(s=>({...s,[pair]:{...sig,price,atr:A,patterns:PAT,warnings:warnings,bullScore,bearScore,ts:ts()}}));
+      const scoreStr=`[B:${bullScore} S:${bearScore}]`;
+      addLog(`🤖 ${pair}: ${sig.signal} ${sig.confidence}% ${scoreStr} | ${sig.strategy}`,sig.signal==="BUY"?"buy":sig.signal==="SELL"?"sell":"info");
+      if(sig.warnings&&sig.warnings!=="none")addLog(`⚠️ ${pair}: ${sig.warnings}`,"warn");
+
+      const isAuto=modeRef.current==="auto";
+      const canTrade=!hasPos&&running&&!lockedRef.current&&sig.signal!=="HOLD"&&Number(sig.confidence)>=70;
 
       if(canTrade){
         if(isAuto){
-          // AUTO MODE: check affordability then trade immediately
-          const csVal  = CS[pair]||0.01;
-          const defLev = 10;
-          const marginPer = (csVal*price)/defLev;
+          const csVal=CS[pair]||0.01;
+          const defLev=10;
+          const marginPer=(csVal*price)/defLev;
           if(avail<marginPer){
-            addLog(`⏸ ${pair} ${sig.signal} — insufficient margin ($${marginPer.toFixed(2)} needed)`, "warn");
+            addLog(`⏸ ${pair} — insufficient margin ($${marginPer.toFixed(2)} needed)`,"warn");
           } else {
-            const useUSDT=Math.min(avail*0.1,avail); // 10% of wallet
-            addLog(`⚡ AUTO: executing ${sig.signal} ${pair} at ${defLev}x with $${useUSDT.toFixed(2)}`,"info");
+            const useUSDT=Math.min(avail*0.08,avail); // 8% per trade (safer)
+            addLog(`⚡ AUTO: ${sig.signal} ${pair} | ${defLev}x | $${useUSDT.toFixed(2)} | Conf:${sig.confidence}%`,"info");
             await executeTrade(sig,pair,defLev,useUSDT);
           }
         } else {
-          // MANUAL MODE: show approval modal
           setPendingSignal({...sig,pair,price,atr:A});
-          addLog(`👆 ${pair}: ${sig.signal} ${sig.confidence}% — tap to approve or skip`,"warn");
+          addLog(`👆 ${pair}: ${sig.signal} ${sig.confidence}% — approval required`,"warn");
         }
       }
     }catch(e){
@@ -626,7 +886,7 @@ For HOLD: {"signal":"HOLD","confidence":40,"strategy":"No Setup","reason":"Marke
       addLog(`🤖 Bot started [${acct}] [${mode.toUpperCase()}] | Trading: ${affordable.join(", ")}${(!isPaper&&skipped.length)?" | Skipping: "+skipped.join(", "):""}`,mode==="auto"?"sell":"info");
       if(isPaper)addLog(`📄 Paper wallet: $${avail.toFixed(2)} virtual USDT — zero real risk`,"info");
       if(mode==="manual")addLog("👆 Manual mode: AI signals → you approve each trade","info");
-      else addLog("⚡ Auto mode: AI analyzes and trades automatically","info");
+      else addLog("⚡ Auto mode: AI analyzes every 90s — trades only on 70%+ confidence with 2:1+ R:R","info");
 
       affordable.forEach(p=>analyze(p));
       aiTimer.current=setInterval(()=>affordable.forEach(p=>analyze(p)),90000);
@@ -725,6 +985,7 @@ For HOLD: {"signal":"HOLD","confidence":40,"strategy":"No Setup","reason":"Marke
             <div style={{fontSize:11,color:"rgba(255,255,255,0.4)",display:"flex",gap:6,alignItems:"center"}}>
               <span style={{width:6,height:6,borderRadius:"50%",background:priceSource.includes("Sim")?"#ffd700":"#00ff88",display:"inline-block"}}/>
               {priceSource}
+              {priceSource.includes("Futures")&&<span style={{fontSize:10,color:"#38bdf8",fontWeight:700}}>FUTURES</span>}
               {weexConnected&&<span style={{color:"#00ff88",fontWeight:600}}>· Weex ✓</span>}
               {locked&&<span style={{color:"#ff4466",fontWeight:700}}>· 🔒 LOCKED</span>}
             </div>
@@ -854,14 +1115,18 @@ For HOLD: {"signal":"HOLD","confidence":40,"strategy":"No Setup","reason":"Marke
                       {sig&&!aiLoading[pair]&&<span style={{...pill(SBG(sig.signal),SC(sig.signal))}}>{sig.signal} {sig.confidence}%</span>}
                       {aiLoading[pair]&&<span style={{fontSize:11,color:"#a78bfa"}}>Analyzing…</span>}
                     </div>
-                    <div style={{fontSize:28,fontWeight:800,background:`linear-gradient(90deg,${c1},${c2})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",marginBottom:3}}>
+                    <div style={{fontSize:28,fontWeight:800,background:`linear-gradient(90deg,${c1},${c2})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",marginBottom:1}}>
                       ${price>0?price.toLocaleString("en-US",{minimumFractionDigits:DP[pair],maximumFractionDigits:DP[pair]}):"—"}
                     </div>
+                    <div style={{fontSize:10,color:"rgba(255,255,255,0.3)",marginBottom:2}}>Futures Mark Price · {priceSource}</div>
                     <div style={{fontSize:12,color:chg>=0?"#00ff88":"#ff4466",fontWeight:600,marginBottom:5}}>{chg>=0?"▲":"▼"} {Math.abs(chg).toFixed(3)}%</div>
                     {sig&&<p style={{margin:"0 0 4px",fontSize:12,color:"rgba(255,255,255,0.5)",lineHeight:1.5}}>{sig.reason}</p>}
-                    <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
+                    {sig?.warnings&&sig.warnings!=="none"&&<p style={{margin:"0 0 4px",fontSize:11,color:"#ffd700",lineHeight:1.4}}>⚠️ {sig.warnings}</p>}
+                    <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
                       <span style={{fontSize:11,color:"rgba(255,255,255,0.4)"}}>RSI <b style={{color:R>70?"#ff4466":R<30?"#00ff88":"#ffd700"}}>{R.toFixed(0)}</b></span>
                       <span style={{fontSize:11,color:"rgba(255,255,255,0.4)"}}>ATR <b>{A.toFixed(DP[pair])}</b></span>
+                      {sig?.bullScore!=null&&<span style={{fontSize:11,color:"#00ff88",fontWeight:600}}>🟢{sig.bullScore}</span>}
+                      {sig?.bearScore!=null&&<span style={{fontSize:11,color:"#ff4466",fontWeight:600}}>🔴{sig.bearScore}</span>}
                       {sig?.strategy&&<span style={{fontSize:11,color:"#a78bfa",fontWeight:500}}>{sig.strategy}</span>}
                     </div>
                   </div>
@@ -869,7 +1134,7 @@ For HOLD: {"signal":"HOLD","confidence":40,"strategy":"No Setup","reason":"Marke
                 </div>
                 {pos&&(
                   <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid rgba(255,255,255,0.08)"}}>
-                    <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginBottom:8}}>
                       {[["Entry",`$${pos.entry.toFixed(DP[pair])}`],["Lev",`${pos.leverage}x`],["SL",`$${Number(pos.sl).toFixed(DP[pair])}`],["TP2",`$${Number(pos.tp2).toFixed(DP[pair])}`]].map(([l,v])=>(
                         <div key={l} style={{background:"rgba(255,255,255,0.05)",borderRadius:8,padding:"5px 7px"}}>
                           <div style={{fontSize:9,color:"rgba(255,255,255,0.35)"}}>{l}</div>
@@ -877,8 +1142,13 @@ For HOLD: {"signal":"HOLD","confidence":40,"strategy":"No Setup","reason":"Marke
                         </div>
                       ))}
                     </div>
-                    <div style={{marginTop:8,fontSize:11,color:(prices[pair]||0)>pos.entry?"#00ff88":"#ff4466",fontWeight:600}}>
-                      {(()=>{const unreal=pos.side==="BUY"?(prices[pair]||0)-pos.entry:pos.entry-(prices[pair]||0);return`Unrealized: ${unreal>=0?"+":""}$${(unreal*pos.qty).toFixed(2)}`;})()}
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <div style={{fontSize:11,color:(prices[pair]||0)>pos.entry?"#00ff88":"#ff4466",fontWeight:600}}>
+                        {(()=>{const unreal=pos.side==="BUY"?(prices[pair]||0)-pos.entry:pos.entry-(prices[pair]||0);return`Unrealized: ${unreal>=0?"+":""}$${(unreal*pos.qty).toFixed(2)}`;})()}
+                      </div>
+                      <button onClick={e=>{e.stopPropagation();closePosition(pair);}} style={{padding:"5px 14px",borderRadius:9,cursor:"pointer",fontSize:11,fontWeight:700,background:"rgba(255,68,102,0.15)",color:"#ff4466",border:"1px solid rgba(255,68,102,0.4)",display:"flex",alignItems:"center",gap:5}}>
+                        ✕ Close Now
+                      </button>
                     </div>
                   </div>
                 )}
@@ -898,7 +1168,7 @@ For HOLD: {"signal":"HOLD","confidence":40,"strategy":"No Setup","reason":"Marke
           {PAIRS.map(pair=>{
             const sig=signals[pair],price=prices[pair]||0,dp=DP[pair];
             const cd=candles[pair]||[],cls=cd.map(c=>c.c);
-            const R=iRSI(cls),E9=iEMA(cls,9),E21=iEMA(cls,21),M=iMACD(cls),SK=iStoch(cd);
+            const R=iRSI(cls),E9=iEMA(cls,9),E21=iEMA(cls,21),M=iMACD(cls),SK=iStoch(cd),SKv=SK.k;
             const [c1,c2]=GRAD[pair],pos=positions[pair];
             return(
               <div key={pair} style={{...glass({marginBottom:14,borderColor:sig?`${SC(sig.signal)}33`:"rgba(255,255,255,0.1)"})}}>
@@ -919,11 +1189,15 @@ For HOLD: {"signal":"HOLD","confidence":40,"strategy":"No Setup","reason":"Marke
                 </div>
                 {sig&&(
                   <>
-                    <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+                    <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap"}}>
                       <span style={{...pill("rgba(167,139,250,0.15)","#a78bfa")}}>{sig.strategy}</span>
                       <span style={{...pill("rgba(255,255,255,0.07)","rgba(255,255,255,0.5)")}}>{sig.bias}</span>
+                      {sig.bullScore!=null&&<span style={{...pill("rgba(0,255,136,0.12)","#00ff88")}}>🟢 {sig.bullScore}</span>}
+                      {sig.bearScore!=null&&<span style={{...pill("rgba(255,68,102,0.12)","#ff4466")}}>🔴 {sig.bearScore}</span>}
                     </div>
                     <div style={{background:"rgba(0,0,0,0.2)",borderRadius:10,padding:"10px 12px",marginBottom:10,fontSize:13,color:"rgba(255,255,255,0.65)",lineHeight:1.6}}>💬 {sig.reason}</div>
+                    {sig.warnings&&sig.warnings!=="none"&&<div style={{padding:"8px 10px",background:"rgba(255,215,0,0.08)",borderRadius:8,border:"1px solid rgba(255,215,0,0.2)",fontSize:11,color:"#ffd700",marginBottom:8}}>⚠️ {sig.warnings}</div>}
+                    {sig.patterns&&sig.patterns.length>0&&<div style={{padding:"7px 10px",background:"rgba(108,92,231,0.1)",borderRadius:8,border:"1px solid rgba(108,92,231,0.2)",fontSize:11,color:"#a78bfa",marginBottom:8}}>🕯️ {sig.patterns.join(" · ")}</div>}
                     {sig.signal!=="HOLD"&&(
                       <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8,marginBottom:10}}>
                         <div style={{background:"rgba(255,68,102,0.1)",borderRadius:12,padding:"10px",border:"1px solid rgba(255,68,102,0.25)"}}>
@@ -941,13 +1215,22 @@ For HOLD: {"signal":"HOLD","confidence":40,"strategy":"No Setup","reason":"Marke
                         👆 Take This Trade
                       </button>
                     )}
-                    {pos&&<div style={{textAlign:"center",padding:"10px",background:"rgba(255,215,0,0.08)",borderRadius:10,border:"1px solid rgba(255,215,0,0.2)",fontSize:12,color:"#ffd700"}}>⚡ Position open — monitoring SL/TP</div>}
+                    {pos&&(
+                      <div>
+                        <div style={{textAlign:"center",padding:"8px",background:"rgba(255,215,0,0.08)",borderRadius:10,border:"1px solid rgba(255,215,0,0.2)",fontSize:12,color:"#ffd700",marginBottom:8}}>
+                          ⚡ {pos.side} position open @ ${pos.entry.toFixed(DP[pair])} · {pos.leverage}x
+                        </div>
+                        <button onClick={()=>closePosition(pair)} style={{width:"100%",padding:"10px",borderRadius:12,cursor:"pointer",fontSize:13,fontWeight:700,background:"rgba(255,68,102,0.12)",color:"#ff4466",border:"1.5px solid rgba(255,68,102,0.4)"}}>
+                          ✕ Close This Trade Now
+                        </button>
+                      </div>
+                    )}
                     {sig.signal==="HOLD"&&<div style={{textAlign:"center",padding:"12px",background:"rgba(255,215,0,0.06)",borderRadius:10,border:"1px solid rgba(255,215,0,0.15)",color:"#ffd700",fontSize:12}}>⏳ Waiting for better setup</div>}
                   </>
                 )}
                 {!sig&&<div style={{textAlign:"center",padding:"20px",color:"rgba(255,255,255,0.3)"}}>Tap Analyze to get AI signal</div>}
                 <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginTop:10,paddingTop:10,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
-                  {[["RSI",R.toFixed(0),R>70?"#ff4466":R<30?"#00ff88":"#ffd700"],["Stoch",SK.toFixed(0),SK>80?"#ff4466":SK<20?"#00ff88":"#ffd700"],["MACD",M.toFixed(DP[pair]>0?2:1),M>0?"#00ff88":"#ff4466"],["Trend",E9>E21?"Bull":"Bear",E9>E21?"#00ff88":"#ff4466"]].map(([l,v,c])=>(
+                  {[["RSI",R.toFixed(0),R>70?"#ff4466":R<30?"#00ff88":"#ffd700"],["Stoch",SK.k.toFixed(0),SK.k>80?"#ff4466":SK.k<20?"#00ff88":"#ffd700"],["MACD",M.macd.toFixed(DP[pair]>0?2:1),M.macd>0?"#00ff88":"#ff4466"],["Trend",E9>E21?"Bull":"Bear",E9>E21?"#00ff88":"#ff4466"]].map(([l,v,c])=>(
                     <div key={l} style={{textAlign:"center",background:"rgba(0,0,0,0.2)",borderRadius:8,padding:"6px 4px"}}>
                       <div style={{fontSize:9,color:"rgba(255,255,255,0.35)"}}>{l}</div>
                       <div style={{fontSize:13,fontWeight:700,color:c,marginTop:2}}>{v}</div>
@@ -971,9 +1254,11 @@ For HOLD: {"signal":"HOLD","confidence":40,"strategy":"No Setup","reason":"Marke
             ))}
           </div>
           <div style={{borderRadius:16,overflow:"hidden",border:"1px solid rgba(255,255,255,0.1)",marginBottom:10}}>
+            {/* Weex perpetual futures chart — WEEX:BTCUSDT.P etc.
+                Fallback: BINANCE:BTCUSDT.P (Binance perpetual — same price as Weex futures) */}
             <iframe key={selPair}
-              src={`https://s.tradingview.com/widgetembed/?symbol=${{ "BTC/USDT":"BINANCE:BTCUSDT","ETH/USDT":"BINANCE:ETHUSDT","SOL/USDT":"BINANCE:SOLUSDT" }[selPair]}&interval=15&theme=dark&style=1&locale=en&toolbar_bg=131722&withdateranges=1`}
-              style={{width:"100%",height:420,border:"none",display:"block"}} title="Chart"/>
+              src={`https://s.tradingview.com/widgetembed/?symbol=${{ "BTC/USDT":"BINANCE:BTCUSDT.P","ETH/USDT":"BINANCE:ETHUSDT.P","SOL/USDT":"BINANCE:SOLUSDT.P" }[selPair]}&interval=15&theme=dark&style=1&locale=en&toolbar_bg=131722&withdateranges=1&hide_side_toolbar=0&allow_symbol_change=1`}
+              style={{width:"100%",height:420,border:"none",display:"block"}} title="Futures Chart"/>
           </div>
           {(()=>{
             const sig=signals[selPair],cd=candles[selPair]||[],cls=cd.map(c=>c.c),dp=DP[selPair];
@@ -983,7 +1268,7 @@ For HOLD: {"signal":"HOLD","confidence":40,"strategy":"No Setup","reason":"Marke
                 <div style={glass()}>
                   <div style={{fontWeight:700,marginBottom:10,fontSize:13}}>Live Indicators — {selPair}</div>
                   <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
-                    {[["RSI",R.toFixed(0),R>70?"#ff4466 (OB)":R<30?"#00ff88 (OS)":"#ffd700"],["Stoch",SK.toFixed(0),SK>80?"#ff4466":SK<20?"#00ff88":"#ffd700"],["MACD",M.toFixed(dp>0?3:1),M>0?"#00ff88":"#ff4466"],["EMA9",`$${E9.toFixed(dp)}`,E9>E21?"#00ff88":"#ff4466"],["EMA50",`$${E50.toFixed(dp)}`,prices[selPair]>E50?"#00ff88":"#ff4466"],["VWAP",`$${VWAP.toFixed(dp)}`,prices[selPair]>VWAP?"#00ff88":"#ff4466"]].map(([l,v,c])=>(
+                    {[["RSI",R.toFixed(0),R>70?"#ff4466 (OB)":R<30?"#00ff88 (OS)":"#ffd700"],["Stoch",SK.k.toFixed(0),SK.k>80?"#ff4466":SK.k<20?"#00ff88":"#ffd700"],["MACD",M.macd.toFixed(dp>0?3:1),M.macd>0?"#00ff88":"#ff4466"],["EMA9",`$${E9.toFixed(dp)}`,E9>E21?"#00ff88":"#ff4466"],["EMA50",`$${E50.toFixed(dp)}`,prices[selPair]>E50?"#00ff88":"#ff4466"],["VWAP",`$${VWAP.toFixed(dp)}`,prices[selPair]>VWAP?"#00ff88":"#ff4466"]].map(([l,v,c])=>(
                       <div key={l} style={mini({textAlign:"center"})}>
                         <div style={{fontSize:9,color:"rgba(255,255,255,0.4)"}}>{l}</div>
                         <div style={{fontSize:13,fontWeight:700,color:c.split(" ")[0],marginTop:3}}>{v}</div>
@@ -1035,11 +1320,14 @@ For HOLD: {"signal":"HOLD","confidence":40,"strategy":"No Setup","reason":"Marke
                   <div style={{height:5,background:"rgba(255,255,255,0.08)",borderRadius:3,overflow:"hidden",marginBottom:6}}>
                     <div style={{height:"100%",width:`${prog}%`,background:`linear-gradient(90deg,${c1},${c2})`,borderRadius:3,transition:"width 0.5s"}}/>
                   </div>
-                  <div style={{display:"flex",justifyContent:"space-between",fontSize:11}}>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:10}}>
                     <span style={{color:"#ff4466"}}>SL ${Number(pos.sl).toFixed(dp)}</span>
                     <span style={{color:"rgba(255,255,255,0.4)"}}>{pos.strategy}</span>
                     <span style={{color:"#00ff88"}}>TP2 ${Number(pos.tp2).toFixed(dp)}</span>
                   </div>
+                  <button onClick={()=>closePosition(pair)} style={{width:"100%",padding:"11px",borderRadius:12,cursor:"pointer",fontSize:13,fontWeight:800,background:"rgba(255,68,102,0.12)",color:"#ff4466",border:"1.5px solid rgba(255,68,102,0.4)",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                    ✕ Close Position Now · ${(()=>{const unreal=(pos.side==="BUY"?prices[pair]-pos.entry:pos.entry-prices[pair])*pos.qty;return`${unreal>=0?"+":""}${unreal.toFixed(2)}`;})()}
+                  </button>
                 </div>
               );
             })
@@ -1132,7 +1420,7 @@ For HOLD: {"signal":"HOLD","confidence":40,"strategy":"No Setup","reason":"Marke
           </div>
           <div style={glass()}>
             <div style={{fontWeight:700,marginBottom:10}}>Bot Configuration</div>
-            {[["Analysis interval","Every 90 seconds"],["Pairs","BTC/USDT · ETH/USDT · SOL/USDT"],["Timeframe","15 minutes"],["AI engine","Claude claude-sonnet-4-6"],["Min confidence","65% required"],["Directions","LONG (BUY) and SHORT (SELL)"],["Stop loss","1.5× ATR below/above entry"],["Take profits","TP1=2× · TP2=3.5× · TP3=5× ATR"],["Auto risk","10% of wallet per trade"],["Contract sizes","BTC=0.001 · ETH=0.01 · SOL=0.1"]].map(([l,v])=>(
+            {[["Analysis interval","Every 90 seconds"],["Pairs","BTC/USDT · ETH/USDT · SOL/USDT"],["Timeframe","15 minutes"],["AI engine","Claude claude-sonnet-4-6"],["Min confidence","70% required (raised from 65%)"],["Directions","LONG (BUY) and SHORT (SELL)"],["Stop loss","1.5× ATR below/above entry"],["Take profits","TP1=2× · TP2=3.5× · TP3=5× ATR"],["Auto risk","10% of wallet per trade"],["Contract sizes","BTC=0.001 · ETH=0.01 · SOL=0.1"]].map(([l,v])=>(
               <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,0.05)",fontSize:12}}>
                 <span style={{color:"rgba(255,255,255,0.45)"}}>{l}</span><span style={{fontWeight:600,color:"#a78bfa"}}>{v}</span>
               </div>
